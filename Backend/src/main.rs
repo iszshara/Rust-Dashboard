@@ -1,4 +1,4 @@
-use std::{fmt::format, thread, time::Duration};
+use std::{fmt::format, os, thread, time::Duration};
 
 use sysinfo::{
     Components, Disks, Networks, System,
@@ -16,13 +16,12 @@ fn main() {
 
         clear_screen();
 
-        print_system_info();
-        //print_total_cpu_usage(&sys);
+        format_system_info();
+        
         format_total_cpu_usage(&sys);
-        print_cpu_usage(&sys);
-        // print_ram_info(&sys);
+        format_cpu_usage(&sys);
         format_ram_info(&sys);
-        print_number_of_cpu(&sys);
+        format_number_of_cpu(&sys);
         format_disk_information();
         // print_processes_id(&sys);
         // print_network();
@@ -35,14 +34,13 @@ fn main() {
         print!("\x1B[2J\x1B[1;1H");
     }
 
-    fn print_cpu_usage(sys: &System) {
+    fn format_cpu_usage(sys: &System) -> String{
         println!("Core Usage: ");
-        for (i, cpu) in sys.cpus().iter().enumerate() {
-            print!("Core {}: {:.2}% \n",
-                i,
-                cpu.cpu_usage()
-            );
-        }
+        sys.cpus()
+            .iter()
+            .enumerate()
+            .map(|(i, cpu)| format!("CPU {:02}: {:>5.2}%\n", i, cpu.cpu_usage()))
+            .collect::<String>()
     }
 
     fn format_total_cpu_usage(sys: &System) -> String {
@@ -64,15 +62,21 @@ fn main() {
         
     }
 
-    fn print_system_info() {
-        println!("System name:              {:?}", System::name());
-        println!("System kernel version:    {:?}", System::kernel_version());
-        println!("System OS version:        {:?}", System::os_version());
-        println!("System host name:         {:?}", System::host_name());
-    }
+    fn format_system_info() -> (String, String, String, String) {
+        let system_name = format!("System name: {:?}\n", System::name());
+        let kernel_version = format!("System kernel version: {:?}\n", System::kernel_version());
+        let os_version = format!("System OS version: {:?}\n", System::os_version());
+        let host_name = format!("System host name: {:?}\n", System::host_name());
+
+        println!("{}{}{}{}", system_name, kernel_version, os_version, host_name);
+
+        (system_name, kernel_version, os_version, host_name)
+    } 
     
-    fn print_number_of_cpu(sys: &System) {
-        println!("Number of CPUs: {}", sys.cpus().len());
+    fn format_number_of_cpu(sys: &System) -> String{
+        let number_of_cpus = format!("Number of CPUs: {}", sys.cpus().len().to_string());
+        println!("{}", number_of_cpus);
+        number_of_cpus
     }
 
     fn format_disk_information() -> String {
@@ -94,7 +98,9 @@ fn main() {
         result 
     }
     
-
+    // fn print_processes_id(sys: &System) {
+    //     sys.process(pid)
+    // }
     // fn print_processes_id(sys: &System) {
     //     for (pid, process) in sys.processes() {
     //         println!("[{pid}] Name: {:?} | Status: {:?} | CPU Usage: {:.2?}% | Memory Usage: {:.2?} GB", 
