@@ -1,7 +1,7 @@
-use std::{fmt::format, os, thread, time::Duration};
+use std::{thread, time::Duration, io::stdout, io::Write};
 
 use sysinfo::{
-    Components, Disks, Networks, System,
+    Disks, Networks, System,
 };
 
 fn kib_to_gib(kib: u64) -> f64 {
@@ -23,8 +23,9 @@ fn main() {
         format_ram_info(&sys);
         format_number_of_cpu(&sys);
         format_disk_information();
-        // print_processes_id(&sys);
-        // print_network();
+        let output = format_processes_id(&sys);
+        println!("{}", output);
+        format_network();
 
         thread::sleep(Duration::from_millis(1000));
         
@@ -32,6 +33,8 @@ fn main() {
 
     fn clear_screen() {
         print!("\x1B[2J\x1B[1;1H");
+        stdout().flush().unwrap();
+
     }
 
     fn format_cpu_usage(sys: &System) -> String{
@@ -41,6 +44,7 @@ fn main() {
             .enumerate()
             .map(|(i, cpu)| format!("CPU {:02}: {:>5.2}%\n", i, cpu.cpu_usage()))
             .collect::<String>()
+        
     }
 
     fn format_total_cpu_usage(sys: &System) -> String {
@@ -50,7 +54,6 @@ fn main() {
     }
 
     fn format_ram_info(sys: &System) -> (String, String, String, String){
-
         let ram_total_memory = format!("Total memory: {:.2} GB", kib_to_gib(sys.total_memory()));
         let ram_used_memory = format!("Used Memory: {:.2} GB", kib_to_gib(sys.used_memory()));
         let ram_total_swap = format!("Total Swap: {:.2} GB", kib_to_gib(sys.total_swap()));
@@ -59,7 +62,6 @@ fn main() {
         println!("{}, {}, {}, {}", ram_total_memory, ram_used_memory, ram_total_swap, ram_used_swap);
 
         (ram_total_memory, ram_used_memory, ram_total_swap, ram_used_swap)
-        
     }
 
     fn format_system_info() -> (String, String, String, String) {
@@ -94,34 +96,39 @@ fn main() {
             println!("{}", disk_info);
         }
         
-
         result 
     }
     
-    // fn print_processes_id(sys: &System) {
-    //     sys.process(pid)
-    // }
-    // fn print_processes_id(sys: &System) {
-    //     for (pid, process) in sys.processes() {
-    //         println!("[{pid}] Name: {:?} | Status: {:?} | CPU Usage: {:.2?}% | Memory Usage: {:.2?} GB", 
-    //             process.name(),
-    //             process.status(),
-    //             process.cpu_usage(),
-    //             kib_to_gib(process.memory())
-    //         );
-    //     }
-    // }
+    fn format_processes_id(sys: &System) -> String{
+        sys.processes()
+            .iter()
+            .map(|(pid, process)| {
+                format!(
+                    "[{pid}] Name: {:<20} | Status: {:<10} | CPU Usage: {:>5.2}% | Memory Usage: {:>6.2} GB",
+                    process.name().to_string_lossy(),
+                    format!("{:?}",process.status()),
+                    process.cpu_usage(),
+                    kib_to_gib(process.memory())
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 
-    // fn print_network() {
-    //     let networks = Networks::new_with_refreshed_list();
-    //     println!("=> networks:");
-    //     for (interface_name, data) in &networks {
-    //         println!(
-    //             "{interface_name}: {} B (down) / {} B (up)",
-    //             data.total_received(),
-    //             data.total_transmitted(),
-    //         );
-    //     }
-    // }
+    fn format_network() -> String {
+        let mut data_transfer = String::new();
+        let networks = Networks::new_with_refreshed_list();
 
+        for (interface_name, data) in &networks {
+            let network_info = format!(
+                "{interface_name}: {} B (down) / {} B (up)",
+                data.total_received(),
+                data.total_transmitted(),
+            );
+            data_transfer.push_str(&network_info);
+            println!("{}", network_info);
+        }
+
+        data_transfer
+    }
 }
