@@ -23,7 +23,7 @@ fn main() {
         // print_ram_info(&sys);
         format_ram_info(&sys);
         print_number_of_cpu(&sys);
-        print_disk_information();
+        format_disk_information();
         // print_processes_id(&sys);
         // print_network();
 
@@ -75,17 +75,25 @@ fn main() {
         println!("Number of CPUs: {}", sys.cpus().len());
     }
 
-    fn print_disk_information() {
-        println!("Disks:");
+    fn format_disk_information() -> String {
+        let mut result = String::new(); 
         let disks = Disks::new_with_refreshed_list();
-
-        for disk in &disks {
-            println!("[{:?}] Total Space: {:.2?} GB | Available Space: {:.2?} GB", 
-                disk.name(), kib_to_gib(disk.total_space()), 
+        
+        for disk in disks.list() {
+            let disk_info = format!(
+                "[{:?}] Total Space: {:.2} GB | Available Space: {:.2} GB\n",
+                disk.name(),
+                kib_to_gib(disk.total_space()),
                 kib_to_gib(disk.available_space())
             );
+            result.push_str(&disk_info);
+            println!("{}", disk_info);
         }
+        
+
+        result 
     }
+    
 
     // fn print_processes_id(sys: &System) {
     //     for (pid, process) in sys.processes() {
