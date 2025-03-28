@@ -1,5 +1,7 @@
 use sysinfo::Networks;
 
+/// Returns the network interfaces with their amount of data traffic in Byte formatted as string
+
 pub fn format_network() -> String {
     let mut data_transfer = String::new();
     let networks = Networks::new_with_refreshed_list();

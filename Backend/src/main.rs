@@ -14,6 +14,7 @@ use system_info::{
 use sysinfo::System;
 use std::{thread, time::Duration, io::stdout, io::Write};
 
+/// refreshes the system every 1000ms and calculates all the called functions from the other files
 fn main() {
     let mut sys = System::new_all();
 
@@ -36,6 +37,8 @@ fn main() {
         thread::sleep(Duration::from_millis(1000));
         
     }
+
+/// Clears the screen and flushes the standard input and output
 
     fn clear_screen() {
         print!("\x1B[2J\x1B[1;1H");

@@ -1,5 +1,14 @@
 use sysinfo::Disks;
-use super::converter::kib_to_gib;
+use super::converter::byte_to_gib;
+
+/// Returns disk names, the total space of the disk and the available space of the disk formatted as a string
+/// 
+/// #Example
+/// 
+/// ```
+/// let output = format_disk_information(&sys);
+/// println!("{}", output);
+/// ```
 
 pub fn format_disk_information() -> String {
     let mut result = String::new(); 
@@ -9,8 +18,8 @@ pub fn format_disk_information() -> String {
         let disk_info = format!(
             "[{:?}] Total Space: {:.2} GB | Available Space: {:.2} GB\n",
             disk.name(),
-            kib_to_gib(disk.total_space()),
-            kib_to_gib(disk.available_space())
+            byte_to_gib(disk.total_space()),
+            byte_to_gib(disk.available_space())
         );
         result.push_str(&disk_info);
         println!("{}", disk_info);

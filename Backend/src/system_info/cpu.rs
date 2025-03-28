@@ -1,5 +1,13 @@
 use sysinfo::System;
 
+/// Returns the full CPU-utilization of all cores formatted as string
+/// 
+/// #Example
+/// ```
+/// let output = format_cpu_usage(&sys);
+/// println!("{}", output);
+/// ```
+
 pub fn format_cpu_usage(sys: &System) -> String{
     println!("Core Usage: ");
     sys.cpus()
@@ -9,11 +17,29 @@ pub fn format_cpu_usage(sys: &System) -> String{
         .collect::<String>()
 }
 
+/// Returns the global CPU usage
+/// 
+/// #Example
+/// 
+/// ```
+/// let output = format_total_cpu_usage(&sys);
+/// println!("{}", output);
+/// ```
+
 pub fn format_total_cpu_usage(sys: &System) -> String {
     let total_cpu_usage = format!("Total CPU Usage: {:.2}% ", sys.global_cpu_usage());
     println!("{}", total_cpu_usage);
     total_cpu_usage
 }
+
+/// Returns the number of available CPUs
+/// 
+/// #Example
+/// 
+/// ```
+/// let output = format_number_of_cpu(&sys);
+/// println!("{}", output);
+/// ```
 
 pub fn format_number_of_cpu(sys: &System) -> String{
     let number_of_cpus = format!("Number of CPUs: {}", sys.cpus().len().to_string());

@@ -1,5 +1,7 @@
 use sysinfo::System;
-use super::converter::kib_to_gib;
+use super::converter::byte_to_gib;
+
+/// Returns the Linux processes id, name, status, cpu usage and memory usage formatted as a string
 
 pub fn format_processes_id(sys: &System) -> String{
     sys.processes()
@@ -10,7 +12,7 @@ pub fn format_processes_id(sys: &System) -> String{
                 process.name().to_string_lossy(),
                 format!("{:?}",process.status()),
                 process.cpu_usage(),
-                kib_to_gib(process.memory())
+                byte_to_gib(process.memory())
             )
         })
         .collect::<Vec<_>>()
