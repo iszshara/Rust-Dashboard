@@ -1,3 +1,4 @@
+//! This module contains a helper function
 
 /// Converter which converts Bytes to GiB
 /// 

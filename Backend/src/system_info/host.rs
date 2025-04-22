@@ -1,3 +1,5 @@
+//! This module fetches Host Information
+
 use sysinfo::System;
 
 /// Returns the system name of the Linux Distribution, kernel version of the Linux Distribution, the OS Version the Linux is currently on and the hostname of the system

@@ -1,3 +1,5 @@
+//! This module fetches network information
+
 use sysinfo::Networks;
 
 /// Returns the network interfaces with their amount of data traffic in Byte formatted as string

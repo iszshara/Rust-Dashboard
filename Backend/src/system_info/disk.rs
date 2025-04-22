@@ -1,3 +1,5 @@
+//! This module fetches Disk Resource Information
+
 use sysinfo::Disks;
 use super::converter::byte_to_gib;
 

@@ -1,3 +1,5 @@
+//! This module fetches process information
+
 use sysinfo::System;
 use super::converter::byte_to_gib;
 

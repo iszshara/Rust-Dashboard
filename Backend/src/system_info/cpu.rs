@@ -1,3 +1,5 @@
+//! This module fecthes CPU resource informations
+
 use sysinfo::System;
 
 /// Returns the full CPU-utilization of all cores formatted as string
