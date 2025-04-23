@@ -1,6 +1,7 @@
-mod system_info;
+pub mod backend;
+pub mod ui;
 
-use system_info::{
+use backend::{
     cpu::format_cpu_usage, 
     cpu::format_total_cpu_usage, 
     cpu::format_number_of_cpu, 
@@ -11,38 +12,44 @@ use system_info::{
     processes::format_processes_id
 };
 
+use crossterm::style::Color;
 use sysinfo::System;
 use std::{thread, time::Duration, io::stdout, io::Write};
 
+use ui::app;
+use color_eyre::Result;
+
 /// refreshes the system every 1000ms and calculates all the called functions from the other files
-fn main() {
-    let mut sys = System::new_all();
+fn main() -> color_eyre::Result<()> {
 
-    loop {
-        sys.refresh_all();
+    ui::app::run_ui()
+    // let mut sys = System::new_all();
 
-        clear_screen();
+    // loop {
+    //     sys.refresh_all();
 
-        format_system_info();
+    //     clear_screen();
+
+    //     format_system_info();
         
-        format_total_cpu_usage(&sys);
-        format_cpu_usage(&sys);
-        format_ram_info(&sys);
-        format_number_of_cpu(&sys);
-        format_disk_information();
-        let output = format_processes_id(&sys);
-        println!("{}", output);
-        format_network();
+    //     format_total_cpu_usage(&sys);
+    //     format_cpu_usage(&sys);
+    //     format_ram_info(&sys);
+    //     format_number_of_cpu(&sys);
+    //     format_disk_information();
+    //     let output = format_processes_id(&sys);
+    //     println!("{}", output);
+    //     format_network();
 
-        thread::sleep(Duration::from_millis(1000));
+    //     thread::sleep(Duration::from_millis(1000));
         
-    }
+    // }
 
-/// Clears the screen and flushes the standard input and output
+// Clears the screen and flushes the standard input and output
 
-    fn clear_screen() {
-        print!("\x1B[2J\x1B[1;1H");
-        stdout().flush().unwrap();
+    // fn clear_screen() {
+    //     print!("\x1B[2J\x1B[1;1H");
+    //     stdout().flush().unwrap();
 
-    } 
+    // } 
 }
