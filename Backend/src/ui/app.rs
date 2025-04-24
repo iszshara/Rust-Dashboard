@@ -15,18 +15,13 @@ use ratatui::{
 use sysinfo::System;
 use std::{time::Instant, time::Duration};
 use crate::{
-    backend::{
-        cpu::{format_cpu_usage, format_total_cpu_usage},
-        memory::format_ram_info,
-        network::{self, format_network},
-        processes::format_processes_id,
-        host::format_username,
-    },
-    app::event::KeyEvent,
-    ui::{layout, layout::terminal_layout},
+    app::event::KeyEvent, backend::{
+        cpu::{format_cpu_usage, format_total_cpu_usage}, host::{format_username, get_current_user}, memory::format_ram_info, network::{self, format_network}, processes::format_processes_id
+    }, ui::layout::{self, terminal_layout}
 };
 //use derive_setters::Setters; // Ensure the derive macro is in scope
 use lipsum::lipsum;
+use std::env;
 
 
 /// run_ui() ist der Einstiegspunkt für die UI des Terminals.
@@ -64,6 +59,7 @@ pub fn run_ui() -> Result<()> {
 fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
     let tick_rate = Duration::from_millis(1000);
     let mut last_tick = Instant::now();
+    let mut show_popup = true;
 
     loop {
 
@@ -72,18 +68,20 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
             last_tick = Instant::now();
         }
         
-        terminal.draw(|frame| render(frame, sys))?;
+        terminal.draw(|frame| render(frame, sys, &mut show_popup))?;
         
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) = event::read()? {
                 break Ok(());
+            } else if let Event::Key(KeyEvent {code: KeyCode::Enter, ..}) = event::read()? {
+                show_popup = false;
             }
         }
     }
 }
 
 /// render() zeichnet den Rahmen der TUI App und erstellt verschiedene Objekte wie zB Paragraphen, Blöcke, etc.
-fn render(frame: &mut Frame, sys: &System) {
+fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool) {
     // Gesamten Bereich des Terminals abrufen
     let area = frame.area();
 
@@ -143,9 +141,7 @@ fn render(frame: &mut Frame, sys: &System) {
     // frame.render_widget(processes_widget, chunks[3]);
 
     struct Popup<'a> {
-        
         title: Line<'a>,
-        
         content: Text<'a>,
         border_style: Style,
         title_style: Style,
@@ -181,21 +177,61 @@ fn render(frame: &mut Frame, sys: &System) {
         }
     }
 
-    let popup = Popup {
-        content: Text::from(format_username()),
-        style: Style::default().fg(Color::Magenta),
-        title: Line::from("Moin"),
-        title_style: Style::new().white().bold(),
-        border_style: Style::new().green(),
-        ..Popup::default()
-    };
+    if *show_popup {
+        let popup_width = 50;
+        let popup_height = 10;
 
-    // Define the popup area within the terminal layout
-    let popup_area = area.inner(Margin {
-        vertical: 5,
-        horizontal: 10,
-    });
+        // Zentriertes Popup-Bereich berechnen
+        let popup_area = Rect::new(
+            (area.width.saturating_sub(popup_width)) / 2,
+            (area.height.saturating_sub(popup_height)) / 2,
+            popup_width,
+            popup_height,
+        );
 
-    frame.render_widget(popup, popup_area);
+        let ascii_art = load_ascii_art(
+            "/home/luis/Rust-Dashboard/Backend/src/ui/ascii_art.txt"
+        );
+        
+        fn load_ascii_art(file_path: &str) -> String {
+            std::fs::read_to_string(file_path).unwrap_or_else(|_| "ASCII art not found".to_string())
+        }
+
+        let username = format!("Guten Moin {}", get_current_user());
+        let mut content = String::new();
+
+        for line in ascii_art.lines() {
+            content.push_str(&format!("{:^width$}\n", line, width = popup_width as usize - 2));
+        }
+
+        // content.push_str(&ascii_art);
+        // content.push('\n');
+
+        // content.push_str(&username);
+
+        content.push_str(&format!("{:^width$}\n", username, width = popup_width as usize - 2));
+
+        let empty_lines = popup_height as usize - 2;
+        for _ in 0..empty_lines{
+            content.push('\n');
+        }
+
+        content.push_str(&format!("{:>width$}", "Double Enter", width = popup_width as usize - 4));
+        
+
+        let popup_block = Block::default()
+            .title("Moin")
+            .borders(Borders::ALL)
+            .border_type(BorderType::Plain)
+            .style(Style::default().fg(Color::Green));
+
+        let popup_paragraph = Paragraph::new(content)
+            .block(popup_block)
+            .wrap(Wrap {trim: true })
+            .style(Style::default().fg(Color::Magenta));
+
+    frame.render_widget(Clear, popup_area);
+    frame.render_widget(popup_paragraph, popup_area);
+    }
         
 }

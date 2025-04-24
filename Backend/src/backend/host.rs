@@ -1,5 +1,7 @@
 //! This module fetches Host Information
 
+use std::env;
+
 use sysinfo::{System, Users};
 
 
@@ -24,4 +26,8 @@ pub fn format_username() -> String {
         user_name = format!("{}", user.name());
     }
     user_name
+}
+
+pub fn get_current_user() -> String {
+    env::var("USER").unwrap_or_else(|_| "Unknown User".to_string())
 }
