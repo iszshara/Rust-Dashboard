@@ -1,12 +1,33 @@
-use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode};
-use ratatui::{prelude::*, widgets::{Block, BorderType, Borders, Paragraph, Wrap}, DefaultTerminal, Frame};
+use color_eyre::{owo_colors::OwoColorize, Result};
+use ratatui::{
+    prelude::*,
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Clear},
+    style::{Style, Stylize},
+    DefaultTerminal, Frame,
+    backend::CrosstermBackend,
+    buffer::Buffer,
+    crossterm::{
+        event::{self, Event, KeyCode},
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+        ExecutableCommand,
+    }, 
+};
 use sysinfo::System;
-use crate::backend::{cpu::{format_cpu_usage, format_total_cpu_usage}, memory::format_ram_info, network::{self, format_network}, processes::format_processes_id};
-use crate::Duration;
-use std::time::Instant;
-use crate::app::event::KeyEvent;
-use crate::ui::layout;
+use std::{time::Instant, time::Duration};
+use crate::{
+    backend::{
+        cpu::{format_cpu_usage, format_total_cpu_usage},
+        memory::format_ram_info,
+        network::{self, format_network},
+        processes::format_processes_id,
+        host::format_username,
+    },
+    app::event::KeyEvent,
+    ui::{layout, layout::terminal_layout},
+};
+//use derive_setters::Setters; // Ensure the derive macro is in scope
+use lipsum::lipsum;
+
 
 /// run_ui() ist der Einstiegspunkt für die UI des Terminals.
 /// Sie initialisiert die notwendigen Komponenten und startet die Hauptschleife,
@@ -120,5 +141,61 @@ fn render(frame: &mut Frame, sys: &System) {
     //     .borders(Borders::ALL);
     // let processes_widget = Paragraph::new(format_processes_id(&sys));
     // frame.render_widget(processes_widget, chunks[3]);
+
+    struct Popup<'a> {
+        
+        title: Line<'a>,
+        
+        content: Text<'a>,
+        border_style: Style,
+        title_style: Style,
+        style: Style,
+    }
+
+    impl<'a> Default for Popup<'a> {
+        fn default() -> Self {
+            Popup {
+                title: Line::from(""),
+                content: Text::from(""),
+                border_style: Style::default(),
+                title_style: Style::default(),
+                style: Style::default(),
+            }
+        }
+    }
+
+    impl Widget for Popup<'_> {
+        fn render(self, area: Rect, buf: &mut Buffer) {
+            // sicherstellen dass die Zellen unter dem Popup gecleared werden um zu verhindern das der Content außerhalb der Box ist
+            Clear.render(area, buf);
+            let block = Block::new()
+                .title(self.title)
+                .title_style(self.title_style)
+                .borders(Borders::ALL)
+                .border_style(self.border_style);
+            Paragraph::new(self.content)
+                .wrap(Wrap {trim: true})
+                .style(self.style)
+                .block(block)
+                .render(area, buf);
+        }
+    }
+
+    let popup = Popup {
+        content: Text::from(format_username()),
+        style: Style::default().fg(Color::Magenta),
+        title: Line::from("Moin"),
+        title_style: Style::new().white().bold(),
+        border_style: Style::new().green(),
+        ..Popup::default()
+    };
+
+    // Define the popup area within the terminal layout
+    let popup_area = area.inner(Margin {
+        vertical: 5,
+        horizontal: 10,
+    });
+
+    frame.render_widget(popup, popup_area);
         
 }

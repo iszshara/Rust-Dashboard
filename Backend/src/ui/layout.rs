@@ -1,9 +1,10 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
-use crate::main;
+//use crate::main;
+
 
 pub fn terminal_layout(area: Rect) -> Vec<Rect> {
-    /// Hautplayout was den Bereich in zwei Bereiche teilt
+    // Hautplayout was den Bereich in zwei Bereiche teilt
     let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .margin(1)
@@ -44,4 +45,6 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         right_chunks[0], // 
         right_chunks[1],
     ]
+
+
 }

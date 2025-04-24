@@ -1,6 +1,7 @@
 //! This module fetches Host Information
 
-use sysinfo::System;
+use sysinfo::{System, Users};
+
 
 /// Returns the system name of the Linux Distribution, kernel version of the Linux Distribution, the OS Version the Linux is currently on and the hostname of the system
 /// formatted as a string 
@@ -15,3 +16,12 @@ pub fn format_system_info() -> (String, String, String, String) {
 
     (system_name, kernel_version, os_version, host_name)
 } 
+
+pub fn format_username() -> String {
+    let users = Users::new_with_refreshed_list();
+    let mut user_name = String::new();
+    for user in users.list() {
+        user_name = format!("{}", user.name());
+    }
+    user_name
+}
