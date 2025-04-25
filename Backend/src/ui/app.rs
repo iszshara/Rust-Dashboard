@@ -103,9 +103,6 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manage
     let cpu_usage = format_total_cpu_usage(sys);
     let cpu_core_usage = format_cpu_usage(sys);
     let combined_cpu_information = format!("{}\n{}", cpu_usage, cpu_core_usage);
-    // let cpu_widget = Paragraph::new(format!("{}", cpu_usage))
-    //     .style(Style::default().fg(Color::Green))
-    //     .alignment(Alignment::Left);
     
 
     let cpu_block = Block::default()
@@ -117,12 +114,12 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manage
     frame.render_widget(cpu_widget, chunks[1]);
     
     // CPU Gauge
-    let cpu_usage_value = cpu_usage.trim_end_matches('%').parse().unwrap_or(0.0);
+    let cpu_usage = sys.global_cpu_usage();
+
     let cpu_gauge = Gauge::default()
         .block(Block::default().title(format_cpu_name(sys)).borders(Borders::ALL))
         .gauge_style(Style::default().fg(Color::LightBlue).bg(Color::Gray))
-        .percent(cpu_usage_value as u16);
-
+        .percent(cpu_usage as u16);
     frame.render_widget(cpu_gauge, chunks[0]);
 
     // Memory Block
@@ -144,10 +141,13 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manage
             .wrap(Wrap { trim: true });
     frame.render_widget(network_widget.clone(), chunks[2]);
 
+    // Processes Block
     let processes_block = Block::default()
         .title("Processes")
         .borders(Borders::ALL);
-    let processes_widget = Paragraph::new(format_processes_id(&sys));
+    let processes_widget = Paragraph::new(format_processes_id(&sys))
+        .block(processes_block)
+        .wrap(Wrap { trim: true });
     frame.render_widget(processes_widget, chunks[4]);
 
     struct Popup<'a> {

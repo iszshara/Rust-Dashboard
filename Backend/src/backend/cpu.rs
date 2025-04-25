@@ -10,6 +10,8 @@ use sysinfo::System;
 /// println!("{}", output);
 /// ```
 
+
+
 pub fn format_cpu_usage(sys: &System) -> String {
     sys.cpus()
         .iter()
@@ -27,35 +29,20 @@ pub fn format_cpu_usage(sys: &System) -> String {
 /// println!("{}", output);
 /// ```
 
+/// This function returns the total CPU usage of the system as a formatted string
 pub fn format_total_cpu_usage(sys: &System) -> String {
     let total_cpu_usage = format!("Total Usage: {:.2}% ", sys.global_cpu_usage());
-    //println!("{}", total_cpu_usage);
     total_cpu_usage
 }
 
-/// Returns the number of available CPUs
-/// 
-/// #Example
-/// 
-/// ```
-/// let output = format_number_of_cpu(&sys);
-/// println!("{}", output);
-/// ```
-
-pub fn format_number_of_cpu(sys: &System) -> String{
-    let number_of_cpus = format!("Number of CPUs: {}", sys.cpus().len().to_string());
-    println!("{}", number_of_cpus);
-    number_of_cpus
-}
-
 // Notiz: Es gibt noch Vendor ID
-
+/// nimmt nur den ersten CPU
+/// holt danach den Namen des ersten CPUs
+/// + Fallback, falls keine CPUs vorhanden sind
 pub fn format_cpu_name(sys: &System) -> String {
     let cpu_name = sys.cpus()
-        .iter()
-        .map(|cpu| cpu.brand().to_string())
-        .collect::<Vec<_>>()
-        .join(", ")
-        ;
+    .get(0)
+    .map(|cpu| cpu.brand().to_string()) 
+    .unwrap_or_else(|| "Unknown CPU".to_string());
     cpu_name
 }
