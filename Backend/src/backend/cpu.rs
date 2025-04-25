@@ -48,3 +48,15 @@ pub fn format_number_of_cpu(sys: &System) -> String{
     println!("{}", number_of_cpus);
     number_of_cpus
 }
+
+// Notiz: Es gibt noch Vendor ID
+
+pub fn format_cpu_name(sys: &System) -> String {
+    let cpu_name = sys.cpus()
+        .iter()
+        .map(|cpu| cpu.brand().to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+        ;
+    cpu_name
+}

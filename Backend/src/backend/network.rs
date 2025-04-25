@@ -2,21 +2,35 @@
 
 use sysinfo::Networks;
 
-/// Returns the network interfaces with their amount of data traffic in Byte formatted as string
+// Erstellt einen neuen Netzwerkmanager und lädt die Schnittstellen
+pub struct NetworkManager {
+    networks: Networks,
+}
 
-pub fn format_network() -> String {
-    let mut data_transfer = String::new();
-    let networks = Networks::new_with_refreshed_list();
-
-    for (interface_name, data) in &networks {
-        let network_info = format!(
-            "{interface_name}: {} B (down) / {} B (up)",
-            data.total_received(),
-            data.total_transmitted(),
-        );
-        data_transfer.push_str(&network_info);
-        println!("{}", network_info);
+impl NetworkManager {
+    /// Erstellt einen neuen NetworkManager und lädt die Netzwerkschnittstellen
+    pub fn new() -> Self {
+        let networks = Networks::new();
+        Self { networks }
     }
 
-    data_transfer
+    /// Aktualisiert nur die Daten der vorhandenen Netzwerkschnittstellen
+    pub fn format_network(&mut self) -> String {
+        // Aktualisiere die Daten der Netzwerkschnittstellen
+        self.networks.refresh(true);
+
+        let mut data_transfer = String::new();
+
+        for (interface_name, data) in self.networks.iter() {
+            let network_info = format!(
+                "{}: {} B (down), {} B (up)\n",
+                interface_name,
+                data.total_received(),
+                data.total_transmitted(),
+            );
+            data_transfer.push_str(&network_info);
+        }
+
+        data_transfer
+    }
 }

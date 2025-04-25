@@ -1,7 +1,7 @@
 use color_eyre::{owo_colors::OwoColorize, Result};
 use ratatui::{
     prelude::*,
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Clear},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Clear, Gauge},
     style::{Style, Stylize},
     DefaultTerminal, Frame,
     backend::CrosstermBackend,
@@ -16,13 +16,9 @@ use sysinfo::System;
 use std::{time::Instant, time::Duration};
 use crate::{
     app::event::KeyEvent, backend::{
-        cpu::{format_cpu_usage, format_total_cpu_usage}, host::{format_username, get_current_user}, memory::format_ram_info, network::{self, format_network}, processes::format_processes_id
+        cpu::{format_cpu_name, format_cpu_usage, format_total_cpu_usage}, host::{format_username, get_current_user}, memory::format_ram_info, network::{self, NetworkManager}, processes::format_processes_id
     }, ui::layout::{self, terminal_layout}
 };
-//use derive_setters::Setters; // Ensure the derive macro is in scope
-use lipsum::lipsum;
-use std::env;
-
 
 /// run_ui() ist der Einstiegspunkt für die UI des Terminals.
 /// Sie initialisiert die notwendigen Komponenten und startet die Hauptschleife,
@@ -60,15 +56,17 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
     let tick_rate = Duration::from_millis(1000);
     let mut last_tick = Instant::now();
     let mut show_popup = true;
+    let mut network_manager = NetworkManager::new();
 
     loop {
 
         if last_tick.elapsed() >= tick_rate {
             sys.refresh_all();
+            network_manager.format_network();
             last_tick = Instant::now();
         }
         
-        terminal.draw(|frame| render(frame, sys, &mut show_popup))?;
+        terminal.draw(|frame| render(frame, sys, &mut show_popup, &mut network_manager))?;
         
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) = event::read()? {
@@ -81,7 +79,7 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
 }
 
 /// render() zeichnet den Rahmen der TUI App und erstellt verschiedene Objekte wie zB Paragraphen, Blöcke, etc.
-fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool) {
+fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manager: &mut NetworkManager) {
     // Gesamten Bereich des Terminals abrufen
     let area = frame.area();
 
@@ -101,38 +99,41 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool) {
     }); // Platz für den Rahmen lassen
     let chunks = layout::terminal_layout(inner_area);
 
-    // CPU-Bereich
-    let cpu_block = Block::default()
-        .title("CPU Usage")
-        .borders(Borders::ALL);
-    let cpu_widget = Paragraph::new(format_total_cpu_usage(&sys))
-        .block(cpu_block)
-        .wrap(Wrap { trim: true });
-    frame.render_widget(cpu_widget, chunks[0]);
+    // CPU Usage
+    let cpu_usage = format_total_cpu_usage(sys);
+    let cpu_text = Paragraph::new(format!("{}", cpu_usage))
+        .style(Style::default().fg(Color::Green))
+        .alignment(Alignment::Left);
 
-    // Speicher-Bereich
+    frame.render_widget(cpu_text, chunks[0]);
+    
+    // CPU Gauge
+    let cpu_usage_value = cpu_usage.trim_end_matches('%').parse().unwrap_or(0.0);
+    let cpu_gauge = Gauge::default()
+        .block(Block::default().title(format_cpu_name(sys)).borders(Borders::ALL))
+        .gauge_style(Style::default().fg(Color::Green).bg(Color::White))
+        .percent(cpu_usage_value as u16);
+
+    frame.render_widget(cpu_gauge, chunks[1]);
+
+    // Memory Block
     let memory_block = Block::default()
         .title("Memory Usage")
         .borders(Borders::ALL);
     let memory_widget = Paragraph::new(format_ram_info(&sys))
         .block(memory_block)
         .wrap(Wrap { trim: true });
-    frame.render_widget(memory_widget, chunks[1]);
+    frame.render_widget(memory_widget, chunks[3]);
 
-
-    // let memory_block = Block::default()
-    //     .title("Memory Usage")
-    //     .borders(Borders::ALL);
-    // let memory_widget = Paragraph::new(format_ram_info(&sys))
-    //     .block(memory_block)
-    //     .wrap(Wrap { trim: true });
-    // frame.render_widget(memory_widget, chunks[1]);
-
-    // let network_block = Block::default()
-    //     .title("Network")
-    //     .borders(Borders::ALL);
-    // let network_widget = Paragraph::new(format_network()).block(network_block);
-    // frame.render_widget(network_widget, chunks[2]);
+    // Network Block
+    let network_block = Block::default()
+        .title("Network")
+        .borders(Borders::ALL);
+    let network_info = network_manager.format_network();
+    let network_widget = Paragraph::new(network_info)
+            .block(network_block)
+            .wrap(Wrap { trim: true });
+    frame.render_widget(network_widget.clone(), chunks[4]);
 
     // let processes_block = Block::default()
     //     .title("Processes")
@@ -189,20 +190,20 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool) {
             popup_height,
         );
 
-        let ascii_art = load_ascii_art(
-            "/home/luis/Rust-Dashboard/Backend/src/ui/ascii_art.txt"
-        );
+        // let ascii_art = load_ascii_art(
+        //     "/home/luis/Rust-Dashboard/Backend/src/ui/ascii_art.txt"
+        // );
         
-        fn load_ascii_art(file_path: &str) -> String {
-            std::fs::read_to_string(file_path).unwrap_or_else(|_| "ASCII art not found".to_string())
-        }
+        // fn load_ascii_art(file_path: &str) -> String {
+        //     std::fs::read_to_string(file_path).unwrap_or_else(|_| "ASCII art not found".to_string())
+        // }
+
+        // for line in ascii_art.lines() {
+        //     content.push_str(&format!("{:^width$}\n", line, width = popup_width as usize - 2));
+        // }
 
         let username = format!("Guten Moin {}", get_current_user());
         let mut content = String::new();
-
-        for line in ascii_art.lines() {
-            content.push_str(&format!("{:^width$}\n", line, width = popup_width as usize - 2));
-        }
 
         // content.push_str(&ascii_art);
         // content.push('\n');
@@ -211,16 +212,16 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool) {
 
         content.push_str(&format!("{:^width$}\n", username, width = popup_width as usize - 2));
 
-        let empty_lines = popup_height as usize - 2;
+        let empty_lines = popup_height as usize - 4;
         for _ in 0..empty_lines{
             content.push('\n');
         }
 
-        content.push_str(&format!("{:>width$}", "Double Enter", width = popup_width as usize - 4));
+        content.push_str(&format!("{:>width$}", "Press Double Enter", width = popup_width as usize - 2));
         
 
         let popup_block = Block::default()
-            .title("Moin")
+            .title("Welcome to the Rust Dashboard")
             .borders(Borders::ALL)
             .border_type(BorderType::Plain)
             .style(Style::default().fg(Color::Green));
