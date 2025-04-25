@@ -10,8 +10,7 @@ use sysinfo::System;
 /// println!("{}", output);
 /// ```
 
-pub fn format_cpu_usage(sys: &System) -> String{
-    println!("Core Usage: ");
+pub fn format_cpu_usage(sys: &System) -> String {
     sys.cpus()
         .iter()
         .enumerate()
@@ -29,7 +28,7 @@ pub fn format_cpu_usage(sys: &System) -> String{
 /// ```
 
 pub fn format_total_cpu_usage(sys: &System) -> String {
-    let total_cpu_usage = format!("Total CPU Usage: {:.2}% ", sys.global_cpu_usage());
+    let total_cpu_usage = format!("Total Usage: {:.2}% ", sys.global_cpu_usage());
     //println!("{}", total_cpu_usage);
     total_cpu_usage
 }

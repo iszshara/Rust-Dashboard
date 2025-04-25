@@ -21,8 +21,8 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Percentage(60), //Oberer Bereich
-                Constraint::Percentage(40), //Unterer Bereich
+                Constraint::Percentage(50), //Oberer Bereich
+                Constraint::Percentage(50), //Unterer Bereich
             ]
             .as_ref(),
         )
@@ -32,8 +32,11 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Length(1),
+                // Constraint::Length(3),
+                // Constraint::Length(3),
                 Constraint::Length(3),
+                Constraint::Percentage(50),
+                //Constraint::Percentage(50),
             ]
             .as_ref()
         )

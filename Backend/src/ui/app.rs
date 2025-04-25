@@ -101,20 +101,29 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manage
 
     // CPU Usage
     let cpu_usage = format_total_cpu_usage(sys);
-    let cpu_text = Paragraph::new(format!("{}", cpu_usage))
-        .style(Style::default().fg(Color::Green))
-        .alignment(Alignment::Left);
+    let cpu_core_usage = format_cpu_usage(sys);
+    let combined_cpu_information = format!("{}\n{}", cpu_usage, cpu_core_usage);
+    // let cpu_widget = Paragraph::new(format!("{}", cpu_usage))
+    //     .style(Style::default().fg(Color::Green))
+    //     .alignment(Alignment::Left);
+    
 
-    frame.render_widget(cpu_text, chunks[0]);
+    let cpu_block = Block::default()
+        .title("CPU Usage")
+        .borders(Borders::ALL);
+    let cpu_widget = Paragraph::new(combined_cpu_information)
+        .block(cpu_block)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(cpu_widget, chunks[1]);
     
     // CPU Gauge
     let cpu_usage_value = cpu_usage.trim_end_matches('%').parse().unwrap_or(0.0);
     let cpu_gauge = Gauge::default()
         .block(Block::default().title(format_cpu_name(sys)).borders(Borders::ALL))
-        .gauge_style(Style::default().fg(Color::Green).bg(Color::White))
+        .gauge_style(Style::default().fg(Color::LightBlue).bg(Color::Gray))
         .percent(cpu_usage_value as u16);
 
-    frame.render_widget(cpu_gauge, chunks[1]);
+    frame.render_widget(cpu_gauge, chunks[0]);
 
     // Memory Block
     let memory_block = Block::default()
@@ -133,13 +142,13 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manage
     let network_widget = Paragraph::new(network_info)
             .block(network_block)
             .wrap(Wrap { trim: true });
-    frame.render_widget(network_widget.clone(), chunks[4]);
+    frame.render_widget(network_widget.clone(), chunks[2]);
 
-    // let processes_block = Block::default()
-    //     .title("Processes")
-    //     .borders(Borders::ALL);
-    // let processes_widget = Paragraph::new(format_processes_id(&sys));
-    // frame.render_widget(processes_widget, chunks[3]);
+    let processes_block = Block::default()
+        .title("Processes")
+        .borders(Borders::ALL);
+    let processes_widget = Paragraph::new(format_processes_id(&sys));
+    frame.render_widget(processes_widget, chunks[4]);
 
     struct Popup<'a> {
         title: Line<'a>,
@@ -179,8 +188,8 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manage
     }
 
     if *show_popup {
-        let popup_width = 50;
-        let popup_height = 10;
+        let popup_width = 35;
+        let popup_height = 5;
 
         // Zentriertes Popup-Bereich berechnen
         let popup_area = Rect::new(
@@ -217,19 +226,22 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manage
             content.push('\n');
         }
 
-        content.push_str(&format!("{:>width$}", "Press Double Enter", width = popup_width as usize - 2));
+        //content.push_str(&format!("{:>width$}", "Press Double Enter", width = popup_width as usize - 2));
         
 
         let popup_block = Block::default()
             .title("Welcome to the Rust Dashboard")
+            //.title_alignment(Alignment::Left)
+            .title_bottom("Press Enter to close")
+            .title_alignment(Alignment::Right)
             .borders(Borders::ALL)
-            .border_type(BorderType::Plain)
-            .style(Style::default().fg(Color::Green));
+            .border_type(BorderType::Rounded)
+            .style(Style::default().fg(Color::LightBlue));
 
         let popup_paragraph = Paragraph::new(content)
             .block(popup_block)
             .wrap(Wrap {trim: true })
-            .style(Style::default().fg(Color::Magenta));
+            .style(Style::default().fg(Color::White));
 
     frame.render_widget(Clear, popup_area);
     frame.render_widget(popup_paragraph, popup_area);
