@@ -8,6 +8,7 @@ use ratatui::{
     crossterm::{
         event::{self, Event, KeyCode},
     },
+    layout::Alignment,
 };
 use sysinfo::System;
 use std::{time::Instant, time::Duration};
@@ -86,9 +87,12 @@ fn render(frame: &mut Frame, sys: &mut System, show_popup: &mut bool, network_ma
 
     // Äußeren Rahmen erstellen
     let outer_block = Block::default()
-        .title("System Monitor") // Titel des Rahmens
-        .borders(Borders::ALL) // Rahmen um den gesamten Bereich
-        .border_type(BorderType::Plain); // Stil des Rahmens
+        .title("System Monitor")
+        .title_alignment(Alignment::Left)
+        .title_bottom(format!("User: {}", get_current_user()))
+        //.title_alignment(Alignment::Right)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded);
 
     // Äußeren Rahmen rendern
     frame.render_widget(outer_block, area);
