@@ -1,8 +1,8 @@
 use color_eyre::{owo_colors::OwoColorize, Result};
 use ratatui::{
     prelude::*,
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Clear, Gauge},
-    style::{Style, Stylize},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Clear, Gauge, Table, Row, Cell},
+    style::{Style, Stylize, Color},
     DefaultTerminal, Frame,
     backend::CrosstermBackend,
     buffer::Buffer,
@@ -10,7 +10,9 @@ use ratatui::{
         event::{self, Event, KeyCode},
         terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
         ExecutableCommand,
-    }, 
+    },
+    layout::Constraint,
+    
 };
 use sysinfo::System;
 use std::{time::Instant, time::Duration};
@@ -112,6 +114,8 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manage
         .block(cpu_block)
         .wrap(Wrap { trim: true });
     frame.render_widget(cpu_widget, chunks[1]);
+
+    
     
     // CPU Gauge
     let cpu_usage = sys.global_cpu_usage();
@@ -130,6 +134,9 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manage
         .block(memory_block)
         .wrap(Wrap { trim: true });
     frame.render_widget(memory_widget, chunks[3]);
+
+    
+    
 
     // Network Block
     let network_block = Block::default()

@@ -32,11 +32,9 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .direction(Direction::Vertical)
         .constraints(
             [
-                // Constraint::Length(3),
-                // Constraint::Length(3),
                 Constraint::Length(3),
                 Constraint::Percentage(50),
-                //Constraint::Percentage(50),
+                
             ]
             .as_ref()
         )
