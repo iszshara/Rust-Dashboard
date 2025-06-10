@@ -2,63 +2,55 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 //use crate::main;
 
-
 pub fn terminal_layout(area: Rect) -> Vec<Rect> {
     // Hautplayout was den Bereich in zwei Bereiche teilt
     let main_chunks = Layout::default()
-        .direction(Direction::Horizontal)
+        .direction(Direction::Vertical) // Zuerst vertical teilen
         .margin(1)
         .constraints(
             [
-                Constraint::Percentage(50), //Linker Bereich
-                Constraint::Percentage(50), //Rechter Bereich
+                Constraint::Length(3),       // Gauge Bar oben
+                Constraint::Percentage(100), // Rest darunter
             ]
             .as_ref(),
         )
         .split(area);
 
-    let left_chunks = Layout::default()
-        .direction(Direction::Vertical)
+    // Horizontale Aufteilung des unteren Bereichs
+    let lower_chunks = Layout::default()
+        .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(50), //Oberer Bereich
-                Constraint::Percentage(50), //Unterer Bereich
-            ]
-            .as_ref(),
-        )
-        .split(main_chunks[0]);
-
-    let cpu_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Length(3),
-                Constraint::Percentage(50),
-                
-            ]
-            .as_ref()
-        )
-        .split(left_chunks[0]);
-
-    let right_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Percentage(30), // Oberer Bereich: Fester Platz für zB Überschrift
-                Constraint::Percentage(70), // Unterer Bereich: für den Rest wie zB Prozesse
+                Constraint::Percentage(50), // Linker Bereich
+                Constraint::Percentage(50), // Rechter Bereich
             ]
             .as_ref(),
         )
         .split(main_chunks[1]);
 
+    // Linke Seite aufteilen
+    let left_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Percentage(30), // CPU Bereich
+                Constraint::Length(22),     // Network
+            ]
+            .as_ref(),
+        )
+        .split(lower_chunks[0]);
+
+    // Rechte Seite aufteilen
+    let right_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
+        .split(lower_chunks[1]);
+
     vec![
-        cpu_chunks[0], // CPU Gauge Bar
-        cpu_chunks[1], // CPU Bereich
-        left_chunks[1], // Memory Bereich
-        right_chunks[0], // 
-        right_chunks[1],
-        
+        main_chunks[0],  // Gauge Bar
+        left_chunks[0],  // CPU Bereich
+        left_chunks[1],  // Network Bereich
+        right_chunks[0], // Memory Bereich
+        right_chunks[1], // Prozesse Bereich
     ]
-
-
 }
