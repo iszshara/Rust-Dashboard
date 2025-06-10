@@ -64,13 +64,13 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
 
         if last_tick.elapsed() >= tick_rate {
             sys.refresh_all();
-            network_manager.format_network();
+            //network_manager.format_network(sys);
             last_tick = Instant::now();
         }
         
         terminal.draw(|frame| render(frame, sys, &mut show_popup, &mut network_manager))?;
         
-        if event::poll(Duration::from_millis(50))? {
+        if event::poll(Duration::from_millis(500))? {
             if let Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) = event::read()? {
                 break Ok(());
             } else if let Event::Key(KeyEvent {code: KeyCode::Enter, ..}) = event::read()? {
@@ -81,7 +81,7 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
 }
 
 /// render() zeichnet den Rahmen der TUI App und erstellt verschiedene Objekte wie zB Paragraphen, Blöcke, etc.
-fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manager: &mut NetworkManager) {
+fn render(frame: &mut Frame, sys: &mut System, show_popup: &mut bool, network_manager: &mut NetworkManager) {
     // Gesamten Bereich des Terminals abrufen
     let area = frame.area();
 
@@ -142,7 +142,7 @@ fn render(frame: &mut Frame, sys: &System, show_popup: &mut bool, network_manage
     let network_block = Block::default()
         .title("Network")
         .borders(Borders::ALL);
-    let network_info = network_manager.format_network();
+    let network_info = network_manager.format_network(sys);
     let network_widget = Paragraph::new(network_info)
             .block(network_block)
             .wrap(Wrap { trim: true });
