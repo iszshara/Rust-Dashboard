@@ -9,7 +9,9 @@ use ratatui::{
         event::{self, Event, KeyCode},
     },
     layout::Alignment,
+    
 };
+use ratatui::text::{Line, Span};
 use sysinfo::System;
 use std::{time::Instant, time::Duration};
 use crate::{
@@ -18,9 +20,11 @@ use crate::{
         host::{get_current_user},
         memory::format_ram_info,
         network::{NetworkManager},
-        processes::format_processes_id
+        //processes::format_processes_id
     }, ui::layout::{self}
 };
+use crate::backend::processes;
+use chrono::Local;
 
 /// run_ui() ist der Einstiegspunkt für die UI des Terminals.
 /// Sie initialisiert die notwendigen Komponenten und startet die Hauptschleife,
@@ -85,14 +89,30 @@ fn render(frame: &mut Frame, sys: &mut System, show_popup: &mut bool, network_ma
     // Gesamten Bereich des Terminals abrufen
     let area = frame.area();
 
+    let current_time = Local::now().format("%H:%M:%S").to_string();
     // Äußeren Rahmen erstellen
     let outer_block = Block::default()
-        .title("System Monitor")
-        .title_alignment(Alignment::Left)
-        .title_bottom(format!("User: {}", get_current_user()))
-        //.title_alignment(Alignment::Right)
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded);
+    .borders(Borders::ALL)
+    .border_type(BorderType::Rounded)
+    // Links oben: System Monitor
+    .title(Span::styled("System Monitor", Style::default()))
+    .title_alignment(Alignment::Left)
+    // Mitte oben: Aktuelle Zeit
+    .title_top(Line::from(vec![
+        Span::styled("".to_string(), Style::default()),  // Leerer Span für Links
+        Span::styled(current_time, Style::default()),    // Zeit in der Mitte
+        Span::styled("".to_string(), Style::default()),  // Leerer Span für Rechts
+    ]).centered())
+    // Links unten: Username
+    // .title_bottom(Span::styled(
+    //     format!("User: {}", get_current_user()), 
+    //     Style::default()
+    // ));
+    .title_bottom(Line::from(vec![
+        Span::styled("".to_string(), Style::default()),  // Leerer Span für Links
+        Span::styled(format!("User: {}", get_current_user()), Style::default()),    // Zeit in der Mitte
+        Span::styled("".to_string(), Style::default()),  // Leerer Span für Rechts
+    ]).centered());
 
     // Äußeren Rahmen rendern
     frame.render_widget(outer_block, area);
@@ -117,8 +137,6 @@ fn render(frame: &mut Frame, sys: &mut System, show_popup: &mut bool, network_ma
         .block(cpu_block)
         .wrap(Wrap { trim: true });
     frame.render_widget(cpu_widget, chunks[1]);
-
-    
     
     // CPU Gauge
     let cpu_usage = sys.global_cpu_usage();
@@ -138,9 +156,6 @@ fn render(frame: &mut Frame, sys: &mut System, show_popup: &mut bool, network_ma
         .wrap(Wrap { trim: true });
     frame.render_widget(memory_widget, chunks[3]);
 
-    
-    
-
     // Network Block
     let network_block = Block::default()
         .title("Network")
@@ -155,10 +170,9 @@ fn render(frame: &mut Frame, sys: &mut System, show_popup: &mut bool, network_ma
     let processes_block = Block::default()
         .title("Processes")
         .borders(Borders::ALL);
-    let processes_widget = Paragraph::new(format_processes_id(&sys))
-        .block(processes_block)
-        .wrap(Wrap { trim: true });
-    frame.render_widget(processes_widget, chunks[4]);
+    let processes_table = processes::create_process_table(sys);
+frame.render_widget(processes_table.block(processes_block), chunks[4]); // oder welcher chunk auch immer für Prozesse verwendet wird
+    //frame.render_widget(processes_widget, chunks[4]);
 
     struct Popup<'a> {
         title: Line<'a>,
@@ -221,7 +235,7 @@ fn render(frame: &mut Frame, sys: &mut System, show_popup: &mut bool, network_ma
         //     content.push_str(&format!("{:^width$}\n", line, width = popup_width as usize - 2));
         // }
 
-        let username = format!("Guten Moin {}", get_current_user());
+        let username = format!("Current User: {}", get_current_user());
         let mut content = String::new();
 
         // content.push_str(&ascii_art);
@@ -240,9 +254,18 @@ fn render(frame: &mut Frame, sys: &mut System, show_popup: &mut bool, network_ma
         
 
         let popup_block = Block::default()
-            .title("Welcome to the Rust Dashboard")
-            //.title_alignment(Alignment::Left)
-            .title_bottom("Press Enter to close")
+            //.title("Welcome to the Rust Dashboard")
+            .title_top(Line::from(vec![
+                Span::styled("".to_string(), Style::default()),  // Leerer Span für Links
+                Span::styled("Welcome to Luis Dashboard", Style::default()),    // Zeit in der Mitte
+                Span::styled("".to_string(), Style::default()),  // Leerer Span für Rechts
+            ]).centered())
+            //.title_bottom("Press Enter to close")
+            .title_bottom(Line::from(vec![
+                Span::styled("".to_string(), Style::default()),  // Leerer Span für Links
+                Span::styled("Press Enter 2x to close", Style::default()),    // Zeit in der Mitte
+                Span::styled("".to_string(), Style::default()),  // Leerer Span für Rechts
+            ]).centered())
             .title_alignment(Alignment::Right)
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
