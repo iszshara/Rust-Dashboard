@@ -1,25 +1,24 @@
-use color_eyre::{owo_colors::OwoColorize, Result};
+use color_eyre::{Result};
 use ratatui::{
     prelude::*,
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Clear, Gauge, Table, Row, Cell},
-    style::{Style, Stylize, Color},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Clear, Gauge},
+    style::{Style,Color},
     DefaultTerminal, Frame,
-    backend::CrosstermBackend,
     buffer::Buffer,
     crossterm::{
         event::{self, Event, KeyCode},
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-        ExecutableCommand,
     },
-    layout::Constraint,
-    
 };
 use sysinfo::System;
 use std::{time::Instant, time::Duration};
 use crate::{
     app::event::KeyEvent, backend::{
-        cpu::{format_cpu_name, format_cpu_usage, format_total_cpu_usage}, host::{format_username, get_current_user}, memory::format_ram_info, network::{self, NetworkManager}, processes::format_processes_id
-    }, ui::layout::{self, terminal_layout}
+        cpu::{format_cpu_name, format_cpu_usage, format_total_cpu_usage},
+        host::{get_current_user},
+        memory::format_ram_info,
+        network::{NetworkManager},
+        processes::format_processes_id
+    }, ui::layout::{self}
 };
 
 /// run_ui() ist der Einstiegspunkt für die UI des Terminals.
