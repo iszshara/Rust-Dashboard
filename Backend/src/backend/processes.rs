@@ -21,7 +21,7 @@ pub fn create_process_table(sys: &System) -> Table<'static> {
         Cell::from("Name"),
         Cell::from("Status"),
         Cell::from("CPU (%)"),
-        Cell::from("Memory (GB)"),
+        Cell::from("Memory"),
     ])
     .style(Style::default().fg(Color::Yellow));
 
@@ -33,7 +33,7 @@ pub fn create_process_table(sys: &System) -> Table<'static> {
             Cell::from(truncate_string(&process.name().to_string_lossy(), 30)),
             Cell::from(format!("{:?}", process.status())),
             Cell::from(format!("{:.2}", process.cpu_usage())),
-            Cell::from(format!("{:.2}", byte_to_gib(process.memory()))),
+            Cell::from(format!("{:.2} GB", byte_to_gib(process.memory()))),
         ])
     }));
     let widths = [
