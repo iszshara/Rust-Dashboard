@@ -34,7 +34,7 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .constraints(
             [
                 Constraint::Percentage(30), // CPU Bereich
-                Constraint::Length(22),     // Network
+                Constraint::Percentage(70), // Network
             ]
             .as_ref(),
         )
