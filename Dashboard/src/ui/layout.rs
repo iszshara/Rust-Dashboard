@@ -34,7 +34,8 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .constraints(
             [
                 Constraint::Percentage(30), // CPU Bereich
-                Constraint::Percentage(70), // Network
+                Constraint::Percentage(20), // Network
+                Constraint::Percentage(50), // Network Diagram
             ]
             .as_ref(),
         )
@@ -47,10 +48,11 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .split(lower_chunks[1]);
 
     vec![
-        main_chunks[0],  // Gauge Bar
-        left_chunks[0],  // CPU Bereich
-        left_chunks[1],  // Network Bereich
+        main_chunks[0], // Gauge Bar
+        left_chunks[0], // CPU Bereich
+        left_chunks[1], // Network Bereich
         right_chunks[0], // Memory Bereich
         right_chunks[1], // Prozesse Bereich
+        left_chunks[2], // Network Diagram Bereich
     ]
 }
