@@ -66,25 +66,40 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
     loop {
         if last_tick.elapsed() >= tick_rate {
             sys.refresh_all();
-            //network_manager.format_network(sys);
             last_tick = Instant::now();
         }
 
         terminal.draw(|frame| render(frame, sys, &mut show_popup, &mut network_manager))?;
 
+        // Ein Event lesen und dann abarbeiten
         if event::poll(Duration::from_millis(500))? {
-            if let Event::Key(KeyEvent {
-                code: KeyCode::Char('q'),
-                ..
-            }) = event::read()?
-            {
-                break Ok(());
-            } else if let Event::Key(KeyEvent {
-                code: KeyCode::Enter,
-                ..
-            }) = event::read()?
-            {
-                show_popup = false;
+            let evt = event::read()?;
+            match evt {
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('q'),
+                    ..
+                }) => break Ok(()),
+                Event::Key(KeyEvent {
+                    code: KeyCode::Enter,
+                    ..
+                }) => {
+                    show_popup = false;
+                }
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('n'),
+                    ..
+                }) => {
+                    let interfaces: Vec<_> = network_manager.network_history_keys();
+                    if !interfaces.is_empty() {
+                        let current_index = interfaces
+                            .iter()
+                            .position(|x| x == network_manager.get_selected_interface())
+                            .unwrap_or(0);
+                        let next_index = (current_index + 1) % interfaces.len();
+                        network_manager.set_selected_interface(interfaces[next_index].clone());
+                    }
+                }
+                _ => {}
             }
         }
     }

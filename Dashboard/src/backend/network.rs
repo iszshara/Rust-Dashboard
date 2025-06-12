@@ -10,48 +10,88 @@ pub struct NetworkManager {
     networks: Networks,
     previous_received: HashMap<String, u64>,
     previous_transmitted: HashMap<String, u64>,
-    download_data: Vec<(f64, f64)>,
-    upload_data: Vec<(f64, f64)>,
+    // Für jedes Interface speichern wir ein Tupel: (Download-Historie, Upload-Historie)
+    network_history: HashMap<String, (Vec<(f64, f64)>, Vec<(f64, f64)>)>,
     scaled_download: Vec<(f64, f64)>,
     scaled_upload: Vec<(f64, f64)>,
     time_counter: f64,
+    selected_interface: String,
 }
 
 impl NetworkManager {
     pub fn new() -> Self {
+        let networks = Networks::new_with_refreshed_list();
+        let mut network_history = HashMap::new();
+
+        // Initialisiere für jede gefundene Schnittstelle die leere Historie
+        for (interface_name, _) in networks.iter() {
+            network_history.insert(interface_name.to_string(), (Vec::new(), Vec::new()));
+        }
+
+        let selected_interface = networks
+            .iter()
+            .next()
+            .map(|(name, _)| name.to_string())
+            .unwrap_or_default();
+
         Self {
             networks: Networks::new_with_refreshed_list(),
             previous_received: HashMap::new(),
             previous_transmitted: HashMap::new(),
-            download_data: Vec::new(),
-            upload_data: Vec::new(),
+            network_history,
             scaled_download: Vec::new(),
             scaled_upload: Vec::new(),
             time_counter: 0.0,
+            selected_interface,
         }
     }
 
-    // Füge diese Methode hinzu, um die Netzwerkdaten zu aktualisieren
-    pub fn update_network_data(&mut self, received_diff: u64, transmitted_diff: u64) {
+    pub fn set_selected_interface(&mut self, interface: String) {
+        self.selected_interface = interface;
+    }
+
+    pub fn network_history_keys(&self) -> Vec<String> {
+        self.network_history.keys().cloned().collect()
+    }
+
+    pub fn get_selected_interface(&self) -> &String {
+        &self.selected_interface
+    }
+
+    // Aktualisiert die Netzwerkdaten für ein bestimmtes Interface.
+    pub fn update_network_data(
+        &mut self,
+        received_diff: u64,
+        transmitted_diff: u64,
+        interface: &str,
+    ) {
         self.time_counter += 1.0;
         let download = received_diff as f64;
         let upload = transmitted_diff as f64;
 
-        self.download_data.push((self.time_counter, download));
-        self.upload_data.push((self.time_counter, -upload)); // Negativ für Darstellung nach unten
+        if let Some((download_history, upload_history)) = self.network_history.get_mut(interface) {
+            download_history.push((self.time_counter, download));
+            // Upload als negative Werte speichern, damit er im Diagramm nach unten verläuft
+            upload_history.push((self.time_counter, -upload));
 
-        // Behalte nur die letzten 50 Datenpunkte
-        if self.download_data.len() > 50 {
-            self.download_data.remove(0);
-            self.upload_data.remove(0);
+            // Behalte nur die letzten 50 Datenpunkte
+            if download_history.len() > 50 {
+                download_history.remove(0);
+                upload_history.remove(0);
+            }
         }
     }
 
+    // Erzeugt das Chart-Widget für das aktuell ausgewählte Interface.
     pub fn get_network_widget(&mut self) -> Chart<'_> {
-        let max_value = self
-            .download_data
+        // Da selected_interface immer gesetzt ist, können wir unwrap() verwenden.
+        let (download_data, upload_data) =
+            self.network_history.get(&self.selected_interface).unwrap();
+
+        // Bestimme den maximalen Wert, um die Skalierung zu ermitteln.
+        let max_value = download_data
             .iter()
-            .chain(self.upload_data.iter())
+            .chain(upload_data.iter())
             .map(|(_, value)| value.abs())
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(0.0);
@@ -66,13 +106,12 @@ impl NetworkManager {
             ("B/s", 1.0)
         };
 
-        self.scaled_download = self
-            .download_data
+        // Aktualisiere die skalieren Datenfelder – diese Felder leben in der Instanz.
+        self.scaled_download = download_data
             .iter()
             .map(|(x, y)| (*x, y / scale_factor))
             .collect();
-        self.scaled_upload = self
-            .upload_data
+        self.scaled_upload = upload_data
             .iter()
             .map(|(x, y)| (*x, y / scale_factor))
             .collect();
@@ -110,25 +149,26 @@ impl NetworkManager {
         Chart::new(datasets)
             .block(
                 Block::default()
-                    .title("Network Traffic")
+                    .title(self.selected_interface.clone())
+                    .title_bottom("Press 'n' to change network interface")
                     .borders(Borders::ALL),
             )
             .x_axis(x_axis)
             .y_axis(y_axis)
     }
 
+    // Formatiert die Netzwerkdaten als String für die Anzeige.
     pub fn format_network(&mut self, sys: &mut System) -> String {
         sys.refresh_all();
         let mut data_transfer = String::new();
-
         self.networks.refresh(true);
         let mut network_updates = Vec::new();
 
+        // Iteriere über alle Interfaces und sammle deren Messwerte.
         for (interface_name, data) in self.networks.iter() {
             let received = data.total_received();
             let transmitted = data.total_transmitted();
 
-            // Berechne die Differenz seit dem letzten Update
             let received_diff = received
                 - self
                     .previous_received
@@ -137,16 +177,15 @@ impl NetworkManager {
             let transmitted_diff =
                 transmitted - self.previous_transmitted.get(interface_name).unwrap_or(&0);
 
-            // Speichere die aktuellen Werte für das nächste Update
             self.previous_received
                 .insert(interface_name.to_string(), received);
             self.previous_transmitted
                 .insert(interface_name.to_string(), transmitted);
 
-            network_updates.push((received_diff, transmitted_diff));
+            // Speichere Updates inklusive Interface-Namen, um sie später zu aktualisieren.
+            network_updates.push((interface_name.to_string(), received_diff, transmitted_diff));
 
-            // Collect network info first
-
+            // Erzeuge den anzuzeigenden String für das Interface.
             let network_info = if received_diff < 1000 && transmitted_diff < 1000 {
                 format!(
                     "{}: {} B/s (down), {} B/s (up)\n",
@@ -177,9 +216,9 @@ impl NetworkManager {
             data_transfer.push_str(&network_info);
         }
 
-        // Update network data after collecting all information
-        for (received_diff, transmitted_diff) in &network_updates {
-            self.update_network_data(*received_diff, *transmitted_diff);
+        // Aktualisiere die Historie für jedes Interface
+        for (interface, received_diff, transmitted_diff) in network_updates {
+            self.update_network_data(received_diff, transmitted_diff, &interface);
         }
 
         data_transfer
