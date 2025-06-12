@@ -186,7 +186,7 @@ fn render(
     frame.render_widget(processes_table.block(processes_block), chunks[4]); // oder welcher chunk auch immer für Prozesse verwendet wird
 
     // Network Diagram Block
-    let network_diagram = network_manager.network_diagram();
+    let network_diagram = network_manager.get_network_widget();
     frame.render_widget(network_diagram, chunks[5]);
 
     struct Popup<'a> {
