@@ -149,8 +149,11 @@ impl NetworkManager {
         Chart::new(datasets)
             .block(
                 Block::default()
-                    .title(self.selected_interface.clone())
-                    .title_bottom("Press 'n' to change network interface")
+                    .title(format!(
+                        "Network Traffic - Interface: {}",
+                        self.selected_interface.clone()
+                    ))
+                    .title_bottom("'n' - change network interface")
                     .borders(Borders::ALL),
             )
             .x_axis(x_axis)
