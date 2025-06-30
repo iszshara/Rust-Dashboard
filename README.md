@@ -12,7 +12,7 @@ To-Do
 
 -> add horizontal bar chart for memory usage
 
--> add uptime to dashboard
+-> add uptime to dashboard [done]
 
 -> add fetch intervall, where the user can choose between 100ms and 1min (60000ms)
 
