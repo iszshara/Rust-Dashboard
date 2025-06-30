@@ -1,4 +1,5 @@
 use crate::backend::processes;
+use crate::backend::processes::SortOrder;
 use crate::{
     app::event::KeyEvent,
     backend::{
@@ -62,6 +63,7 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
     let mut last_tick = Instant::now();
     let mut show_popup = true;
     let mut network_manager = NetworkManager::new();
+    let mut sort_order = SortOrder::default();
 
     loop {
         if last_tick.elapsed() >= tick_rate {
@@ -69,7 +71,15 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
             last_tick = Instant::now();
         }
 
-        terminal.draw(|frame| render(frame, sys, &mut show_popup, &mut network_manager))?;
+        terminal.draw(|frame| {
+            render(
+                frame,
+                sys,
+                &mut show_popup,
+                &mut network_manager,
+                &mut sort_order,
+            )
+        })?;
 
         // Ein Event lesen und dann abarbeiten
         if event::poll(Duration::from_millis(500))? {
@@ -99,6 +109,42 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
                         network_manager.set_selected_interface(interfaces[next_index].clone());
                     }
                 }
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('c'), // 'c' for CPU
+                    ..
+                }) => {
+                    sort_order = match sort_order {
+                        SortOrder::CpuAsc => SortOrder::CpuDesc,
+                        _ => SortOrder::CpuAsc, // Default to ascending if not currently CPU sorted
+                    };
+                }
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('m'), // 'm' for Memory
+                    ..
+                }) => {
+                    sort_order = match sort_order {
+                        SortOrder::MemoryAsc => SortOrder::MemoryDesc,
+                        _ => SortOrder::MemoryAsc,
+                    };
+                }
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('p'), // 'p' for PID
+                    ..
+                }) => {
+                    sort_order = match sort_order {
+                        SortOrder::PidAsc => SortOrder::PidDesc,
+                        _ => SortOrder::PidAsc,
+                    };
+                }
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('s'), // 's' for Name (s for string/sort by name)
+                    ..
+                }) => {
+                    sort_order = match sort_order {
+                        SortOrder::NameAsc => SortOrder::NameDesc,
+                        _ => SortOrder::NameAsc,
+                    };
+                }
                 _ => {}
             }
         }
@@ -111,6 +157,7 @@ fn render(
     sys: &mut System,
     show_popup: &mut bool,
     network_manager: &mut NetworkManager,
+    sort_order: &mut SortOrder,
 ) {
     // Gesamten Bereich des Terminals abrufen
     let area = frame.area();
@@ -198,7 +245,7 @@ fn render(
 
     // Processes Block
     let processes_block = Block::default().title("Processes").borders(Borders::ALL);
-    let processes_table = processes::create_process_table(sys);
+    let processes_table = processes::create_process_table(sys, *sort_order);
     frame.render_widget(processes_table.block(processes_block), chunks[4]); // oder welcher chunk auch immer für Prozesse verwendet wird
 
     // Network Diagram Block
