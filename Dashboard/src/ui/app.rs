@@ -132,18 +132,19 @@ fn render(
             ])
             .centered(),
         )
-        // Links unten: Username
-        // .title_bottom(Span::styled(
-        //     format!("User: {}", get_current_user()),
-        //     Style::default()
-        // ));
         .title_bottom(
-            Line::from(vec![
-                Span::styled("".to_string(), Style::default()), // Leerer Span für Links
-                Span::styled(format!("User: {}", get_current_user()), Style::default()), // Zeit in der Mitte
-                Span::styled("".to_string(), Style::default()), // Leerer Span für Rechts
-            ])
+            Line::from(vec![Span::styled(
+                format!("User: {}", get_current_user()),
+                Style::default(),
+            )])
             .centered(),
+        )
+        .title_bottom(
+            Line::from(vec![Span::styled(
+                format!("{}", system_uptime()),
+                Style::default(),
+            )])
+            .right_aligned(),
         );
 
     // Äußeren Rahmen rendern
@@ -253,25 +254,8 @@ fn render(
             popup_height,
         );
 
-        // let ascii_art = load_ascii_art(
-        //     "/home/luis/Rust-Dashboard/Backend/src/ui/ascii_art.txt"
-        // );
-
-        // fn load_ascii_art(file_path: &str) -> String {
-        //     std::fs::read_to_string(file_path).unwrap_or_else(|_| "ASCII art not found".to_string())
-        // }
-
-        // for line in ascii_art.lines() {
-        //     content.push_str(&format!("{:^width$}\n", line, width = popup_width as usize - 2));
-        // }
-
         let username = format!("Current User: {}", get_current_user());
         let mut content = String::new();
-
-        // content.push_str(&ascii_art);
-        // content.push('\n');
-
-        // content.push_str(&username);
 
         content.push_str(&format!(
             "{:^width$}\n",
@@ -283,8 +267,6 @@ fn render(
         for _ in 0..empty_lines {
             content.push('\n');
         }
-
-        //content.push_str(&format!("{:>width$}", "Press Double Enter", width = popup_width as usize - 2));
 
         let popup_block = Block::default()
             //.title("Welcome to the Rust Dashboard")
@@ -317,5 +299,21 @@ fn render(
 
         frame.render_widget(Clear, popup_area);
         frame.render_widget(popup_paragraph, popup_area);
+    }
+}
+
+fn system_uptime() -> String {
+    let uptime = System::uptime();
+    if uptime < 60 {
+        return format!("Uptime: {} seconds", uptime);
+    } else if uptime < 3600 {
+        let minutes = uptime / 60;
+        return format!("Uptime: {} minutes", minutes);
+    } else if uptime < 86400 {
+        let hours = uptime / 3600;
+        return format!("Uptime: {} hours", hours);
+    } else {
+        let days = uptime / 86400;
+        return format!("Uptime: {} days", days);
     }
 }
