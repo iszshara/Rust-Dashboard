@@ -3,7 +3,7 @@ use crate::backend::processes::SortOrder;
 use crate::{
     app::event::KeyEvent,
     backend::{
-        cpu::{format_cpu_name, format_cpu_usage, format_total_cpu_usage},
+        cpu::{format_cpu_name, format_cpu_usage},
         host::get_current_user,
         memory::ram_info_table,
         network::NetworkManager,
@@ -205,14 +205,14 @@ fn render(
     let chunks = layout::terminal_layout(inner_area);
 
     // CPU Usage
-    let cpu_usage = format_total_cpu_usage(sys);
+    //let cpu_usage = format_total_cpu_usage(sys);
     let cpu_core_usage = format_cpu_usage(sys);
-    let combined_cpu_information = format!("{}\n{}", cpu_usage, cpu_core_usage);
+    //let combined_cpu_information = format!("{}\n{}", cpu_usage, cpu_core_usage);
 
-    let cpu_block = Block::default().title("CPU Usage").borders(Borders::ALL);
-    let cpu_widget = Paragraph::new(combined_cpu_information)
-        .block(cpu_block)
-        .wrap(Wrap { trim: true });
+    let cpu_block = Block::default()
+        .title("CPU Core Usage")
+        .borders(Borders::ALL);
+    let cpu_widget = Paragraph::new(cpu_core_usage).block(cpu_block);
     frame.render_widget(cpu_widget, chunks[1]);
 
     // CPU Gauge
