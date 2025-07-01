@@ -1,3 +1,6 @@
+use ratatui::style::Color;
+use ratatui::text::Line;
+use ratatui::text::Span;
 use ratatui::{
     style::{Style, Stylize},
     symbols,
@@ -8,10 +11,16 @@ use sysinfo::{Networks, System};
 
 pub struct NetworkManager {
     networks: Networks,
+
     previous_received: HashMap<String, u64>,
     previous_transmitted: HashMap<String, u64>,
-    // Für jedes Interface speichern wir ein Tupel: (Download-Historie, Upload-Historie)
+    // Für jedes Interface Tupel: (Download-Historie, Upload-Historie)
     network_history: HashMap<String, (Vec<(f64, f64)>, Vec<(f64, f64)>)>,
+    // Vector (da sich die Daten immer wieder ändern) und zweimal f64 für Zeit und Wert
+    // Diese Felder werden für die Anzeige im Diagramm verwendet
+    // Download wird positiv und Upload negativ skaliert, damit sie im Diagramm korrekt angezeigt
+    // werden können.
+    // Download nach oben, Upload nach unten.
     scaled_download: Vec<(f64, f64)>,
     scaled_upload: Vec<(f64, f64)>,
     time_counter: f64,
@@ -153,7 +162,11 @@ impl NetworkManager {
                         "Network Traffic - Interface: {}",
                         self.selected_interface.clone()
                     ))
-                    .title_bottom("'n' - change network interface")
+                    // .title_bottom("'n' - change network interface")
+                    .title_bottom(Line::from(vec![
+                        Span::styled("i", Style::default().fg(Color::Yellow)),
+                        Span::raw(" - to change network interface"),
+                    ]))
                     .borders(Borders::ALL),
             )
             .x_axis(x_axis)

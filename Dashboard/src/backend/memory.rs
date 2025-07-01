@@ -1,26 +1,43 @@
 //! This module fetches memory resource information
 
-use sysinfo::System;
 use super::converter::byte_to_gib;
+use ratatui::prelude::Constraint;
+use ratatui::style::Color;
+use ratatui::style::Style;
+use ratatui::widgets::{Row, Table};
+use sysinfo::System;
 
-/// Returns memory and swap information formatted as a single string
-pub fn format_ram_info(sys: &System) -> String {
-    let ram_total_memory = format!("Total memory: {:.2}", byte_to_gib(sys.total_memory()));
-    let ram_used_memory = format!("Used memory: {:.2}", byte_to_gib(sys.used_memory()));
-    let ram_total_swap = format!("Total swap: {:.2}", byte_to_gib(sys.total_swap()));
-    let ram_used_swap = format!("Used swap: {:.2}", byte_to_gib(sys.used_swap()));
-
-    let combined_info = format!(
-        "{} GB\n{} GB\n{} GB\n{} GB",
-        ram_total_memory, ram_used_memory, ram_total_swap, ram_used_swap
-    );
-
-    let max_lines = 4;
-    let truncated_info = combined_info
-        .lines()
-        .take(max_lines)
-        .collect::<Vec<&str>>()
-        .join("\n");
-
-    truncated_info
+/// Returns total / used memory and swap / used swap information in a table format
+use ratatui::widgets::Cell;
+pub fn ram_info_table(sys: &System) -> Table<'static> {
+    let rows = vec![
+        Row::new(vec![
+            Cell::from("Total"),
+            Cell::from("Memory"),
+            Cell::from(format!("{:.2} GB", byte_to_gib(sys.total_memory()))),
+        ]),
+        Row::new(vec![
+            Cell::from("Used"),
+            Cell::from("Memory"),
+            Cell::from(format!("{:.2} GB", byte_to_gib(sys.used_memory()))),
+        ]),
+        Row::new(vec![
+            Cell::from("Total"),
+            Cell::from("Swap"),
+            Cell::from(format!("{:.2} GB", byte_to_gib(sys.total_swap()))),
+        ]),
+        Row::new(vec![
+            Cell::from("Used"),
+            Cell::from("Swap"),
+            Cell::from(format!("{:.2} GB", byte_to_gib(sys.used_swap()))),
+        ]),
+    ];
+    let widths = [
+        Constraint::Length(5),
+        Constraint::Length(6),
+        Constraint::Length(10),
+    ];
+    Table::new(rows, widths)
+        .column_spacing(1)
+        .style(Style::default().fg(Color::White))
 }

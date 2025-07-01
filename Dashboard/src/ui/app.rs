@@ -5,7 +5,7 @@ use crate::{
     backend::{
         cpu::{format_cpu_name, format_cpu_usage, format_total_cpu_usage},
         host::get_current_user,
-        memory::format_ram_info,
+        memory::ram_info_table,
         network::NetworkManager,
         //processes::format_processes_id
     },
@@ -96,7 +96,7 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
                     show_popup = false;
                 }
                 Event::Key(KeyEvent {
-                    code: KeyCode::Char('n'),
+                    code: KeyCode::Char('i'),
                     ..
                 }) => {
                     let interfaces: Vec<_> = network_manager.network_history_keys();
@@ -137,7 +137,7 @@ fn run(mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
                     };
                 }
                 Event::Key(KeyEvent {
-                    code: KeyCode::Char('s'), // 's' for Name (s for string/sort by name)
+                    code: KeyCode::Char('n'), // 's' for Name
                     ..
                 }) => {
                     sort_order = match sort_order {
@@ -230,10 +230,8 @@ fn render(
 
     // Memory Block
     let memory_block = Block::default().title("Memory Usage").borders(Borders::ALL);
-    let memory_widget = Paragraph::new(format_ram_info(&sys))
-        .block(memory_block)
-        .wrap(Wrap { trim: true });
-    frame.render_widget(memory_widget, chunks[3]);
+    let memory_table = ram_info_table(sys).block(memory_block);
+    frame.render_widget(memory_table, chunks[3]);
 
     // Network Block
     let network_block = Block::default().title("Network").borders(Borders::ALL);
@@ -244,7 +242,23 @@ fn render(
     frame.render_widget(network_widget.clone(), chunks[2]);
 
     // Processes Block
-    let processes_block = Block::default().title("Processes").borders(Borders::ALL);
+    let processes_block = Block::default()
+        .title("Processes")
+        .title_bottom(
+            Line::from(vec![
+                Span::styled("C", Style::default().fg(Color::Yellow)),
+                Span::raw("PU───"),
+                Span::styled("M", Style::default().fg(Color::Yellow)),
+                Span::raw("emory───"),
+                Span::styled("P", Style::default().fg(Color::Yellow)),
+                Span::raw("ID───"),
+                Span::styled("N", Style::default().fg(Color::Yellow)),
+                Span::raw("ame───"),
+            ])
+            .left_aligned(),
+        )
+        .borders(Borders::ALL);
+
     let processes_table = processes::create_process_table(sys, *sort_order);
     frame.render_widget(processes_table.block(processes_block), chunks[4]); // oder welcher chunk auch immer für Prozesse verwendet wird
 
@@ -305,7 +319,7 @@ fn render(
         let mut content = String::new();
 
         content.push_str(&format!(
-            "{:^width$}\n",
+            "{:-^width$}\n",
             username,
             width = popup_width as usize - 2
         ));
@@ -325,11 +339,10 @@ fn render(
                 ])
                 .centered(),
             )
-            //.title_bottom("Press Enter to close")
             .title_bottom(
                 Line::from(vec![
                     Span::styled("".to_string(), Style::default()), // Leerer Span für Links
-                    Span::styled("Press Enter 2x to close", Style::default()), // Zeit in der Mitte
+                    Span::styled("Press Enter to close", Style::default()), // Zeit in der Mitte
                     Span::styled("".to_string(), Style::default()), // Leerer Span für Rechts
                 ])
                 .centered(),

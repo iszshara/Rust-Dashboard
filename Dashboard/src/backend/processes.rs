@@ -51,7 +51,12 @@ pub fn create_process_table(sys: &System, sort_order: SortOrder) -> Table<'stati
             });
         }
         SortOrder::CpuDesc => {
-            processes.sort_by(|a, b| a.1.cpu_usage().partial_cmp(&b.1.cpu_usage()).unwrap_or(std::cmp::Ordering::Equal).reverse());
+            processes.sort_by(|a, b| {
+                a.1.cpu_usage()
+                    .partial_cmp(&b.1.cpu_usage())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .reverse()
+            });
         }
         SortOrder::MemoryAsc => {
             processes.sort_by_key(|a| a.1.memory());
@@ -103,13 +108,6 @@ pub fn create_process_table(sys: &System, sort_order: SortOrder) -> Table<'stati
         Constraint::Length(12), // Memory
     ];
     Table::new(rows, widths)
-        .widths(&[
-            Constraint::Length(8),  // PID
-            Constraint::Length(30), // Name
-            Constraint::Length(10), // Status
-            Constraint::Length(10), // CPU
-            Constraint::Length(12), // Memory
-        ])
         .column_spacing(1)
         .style(Style::default().fg(Color::White))
 }
