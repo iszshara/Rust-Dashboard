@@ -3,14 +3,12 @@
 use sysinfo::System;
 
 /// Returns the full CPU-utilization of all cores formatted as string
-/// 
+///
 /// #Example
 /// ```
 /// let output = format_cpu_usage(&sys);
 /// println!("{}", output);
 /// ```
-
-
 
 pub fn format_cpu_usage(sys: &System) -> String {
     sys.cpus()
@@ -21,9 +19,9 @@ pub fn format_cpu_usage(sys: &System) -> String {
 }
 
 /// Returns the global CPU usage
-/// 
+///
 /// #Example
-/// 
+///
 /// ```
 /// let output = format_total_cpu_usage(&sys);
 /// println!("{}", output);
@@ -40,9 +38,10 @@ pub fn format_total_cpu_usage(sys: &System) -> String {
 /// holt danach den Namen des ersten CPUs
 /// + Fallback, falls keine CPUs vorhanden sind
 pub fn format_cpu_name(sys: &System) -> String {
-    let cpu_name = sys.cpus()
-    .get(0)
-    .map(|cpu| cpu.brand().to_string()) 
-    .unwrap_or_else(|| "Unknown CPU".to_string());
+    let cpu_name = sys
+        .cpus()
+        .get(0)
+        .map(|cpu| cpu.brand().to_string())
+        .unwrap_or_else(|| "Unknown CPU".to_string());
     cpu_name
 }
