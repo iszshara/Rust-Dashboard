@@ -1,5 +1,5 @@
+use crate::backend::processes;
 use crate::backend::processes::SortOrder;
-use crate::backend::{cpu, processes};
 use crate::{
     app::event::KeyEvent,
     backend::{
@@ -7,27 +7,38 @@ use crate::{
         host::get_current_user,
         memory::ram_info_table,
         network::NetworkManager,
-        //processes::format_processes_id
     },
     ui::layout::{self},
 };
 use chrono::Local;
 use color_eyre::Result;
+use ratatui::style::Color;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::ScrollbarState;
+use ratatui::widgets::Scrollbar;
+use ratatui::widgets::{ScrollbarOrientation, ScrollbarState};
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
     crossterm::event::{self, Event, KeyCode},
     layout::Alignment,
     prelude::*,
-    style::{Color, Style},
+    style::Style,
     widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph, Wrap},
 };
-use std::{time::Duration, time::Instant};
+use std::time::{Duration, Instant};
 use sysinfo::System;
 
-#[derive(Default)]
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            vertical_scroll_state: ScrollbarState::default(),
+            horizontal_scroll_state: ScrollbarState::default(),
+            vertical_scroll: 0,
+            horizontal_scroll: 0,
+        }
+    }
+}
+
 struct App {
     pub vertical_scroll_state: ScrollbarState,
     pub horizontal_scroll_state: ScrollbarState,
@@ -58,8 +69,8 @@ pub fn run_ui() -> Result<()> {
     let mut sys = System::new_all();
     sys.refresh_all();
 
-    //let result = App::run(self, terminal, &mut sys);
-    let app_result = App::default().run(terminal, &mut sys);
+    let app = App::default();
+    let app_result = app.run(terminal, &mut sys);
     ratatui::restore();
     app_result
 }
@@ -70,7 +81,14 @@ pub fn run_ui() -> Result<()> {
 /// Das wird unterbrochen wenn es innerhalb von einer Zeitspanne von 50 ms ein "KeyEvent" gibt, bei dem definiert wurde das 'q' für das Beende der Schleife steht
 impl App {
     pub fn run(mut self, mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
+        // Disable mouse capture to prevent performance issues with mouse wheel
+        crossterm::execute!(
+            terminal.backend_mut(),
+            crossterm::event::DisableMouseCapture
+        )?;
+
         let tick_rate = Duration::from_millis(1000);
+
         let mut last_tick = Instant::now();
         let mut show_popup = true;
         let mut network_manager = NetworkManager::new();
@@ -101,6 +119,14 @@ impl App {
                         code: KeyCode::Char('q'),
                         ..
                     }) => break Ok(()),
+                    Event::Mouse(event::MouseEvent {
+                        kind: event::MouseEventKind::ScrollDown,
+                        ..
+                    }) => {}
+                    Event::Mouse(event::MouseEvent {
+                        kind: event::MouseEventKind::ScrollUp,
+                        ..
+                    }) => {}
                     Event::Key(KeyEvent {
                         code: KeyCode::Enter,
                         ..
@@ -190,6 +216,7 @@ impl App {
                             .horizontal_scroll_state
                             .position(self.horizontal_scroll);
                     }
+
                     _ => {}
                 }
             }
@@ -268,6 +295,18 @@ impl App {
             .wrap(Wrap { trim: true })
             .scroll((self.vertical_scroll as u16, 0));
         frame.render_widget(cpu_widget, chunks[1]);
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .style(style::Color::LightBlue)
+                .begin_symbol(Some("∧")) // ↑
+                .end_symbol(Some("∨")) // ↓
+                .thumb_symbol("░"), // ░
+            chunks[1].inner(Margin {
+                vertical: 1,
+                horizontal: 0,
+            }),
+            &mut self.vertical_scroll_state,
+        );
 
         // CPU Gauge
         let cpu_usage = sys.global_cpu_usage();
