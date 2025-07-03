@@ -5,8 +5,9 @@
 /// #Example
 /// 
 /// ```
-/// 1 GiB * 1024^3 = 1073741824 or
-/// 1 GB * 1000^3 = 1000000000
+/// use linux_dashboard::backend::converter::byte_to_gib;
+/// let gib = byte_to_gib(1073741824);
+/// assert_eq!(gib, 1.0);
 /// ```
 /// 
 pub fn byte_to_gib(kib: u64) -> f64 {

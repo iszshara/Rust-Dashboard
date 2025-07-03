@@ -8,8 +8,9 @@ use super::converter::byte_to_gib;
 /// #Example
 /// 
 /// ```
-/// let output = format_disk_information(&sys);
-/// println!("{}", output);
+/// use linux_dashboard::backend::disk::format_disk_information;
+/// let output = format_disk_information();
+/// assert!(output.contains("Total Space"));
 /// ```
 
 pub fn format_disk_information() -> String {

@@ -1,15 +1,13 @@
 use crate::backend::processes;
 use crate::backend::processes::SortOrder;
-use crate::{
-    app::event::KeyEvent,
-    backend::{
+use crate::backend::system_info::SystemInfo;
+use crate::{backend::{
         cpu::{format_cpu_name, format_cpu_usage},
         host::get_current_user,
         memory::ram_info_table,
         network::NetworkManager,
     },
-    ui::layout::{self},
-};
+    ui::layout::{self}};
 use chrono::Local;
 use color_eyre::Result;
 use ratatui::style::Color;
@@ -19,7 +17,7 @@ use ratatui::widgets::{ScrollbarOrientation, ScrollbarState};
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
-    crossterm::event::{self, Event, KeyCode},
+    crossterm::event::{self, Event, KeyCode, KeyEvent},
     layout::Alignment,
     prelude::*,
     style::Style,
@@ -282,7 +280,7 @@ impl App {
         let cpu_core_usage = format_cpu_usage(sys);
         self.vertical_scroll_state = self
             .vertical_scroll_state
-            .content_length(sys.cpus().len() as usize);
+            .content_length(sys.get_cpus().len() as usize);
 
         //let combined_cpu_information = format!("{}\n{}", cpu_usage, cpu_core_usage);
 
