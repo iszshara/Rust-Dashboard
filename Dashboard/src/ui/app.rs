@@ -1,13 +1,15 @@
 use crate::backend::processes;
 use crate::backend::processes::SortOrder;
 use crate::backend::system_info::SystemInfo;
-use crate::{backend::{
+use crate::{
+    backend::{
         cpu::{format_cpu_name, format_cpu_usage},
         host::get_current_user,
         memory::ram_info_table,
         network::NetworkManager,
     },
-    ui::layout::{self}};
+    ui::layout::{self},
+};
 use chrono::Local;
 use color_eyre::Result;
 use ratatui::style::Color;
@@ -33,15 +35,22 @@ impl Default for App {
             horizontal_scroll_state: ScrollbarState::default(),
             vertical_scroll: 0,
             horizontal_scroll: 0,
+            current_fetch_interval: 1000, // Initial 1000ms
+            minus_button_rect: Rect::default(),
+            plus_button_rect: Rect::default(),
         }
     }
 }
 
+#[allow(dead_code)] // used to get rid of annoying warnings
 struct App {
     pub vertical_scroll_state: ScrollbarState,
     pub horizontal_scroll_state: ScrollbarState,
     pub vertical_scroll: usize,
     pub horizontal_scroll: usize,
+    pub current_fetch_interval: u64,
+    pub minus_button_rect: Rect,
+    pub plus_button_rect: Rect,
 }
 
 /// run_ui() ist der Einstiegspunkt für die UI des Terminals.
@@ -85,38 +94,39 @@ impl App {
             crossterm::event::DisableMouseCapture
         )?;
 
-        let tick_rate = Duration::from_millis(1000);
-
         let mut last_tick = Instant::now();
         let mut show_popup = true;
         let mut network_manager = NetworkManager::new();
         let mut sort_order = SortOrder::default();
 
         loop {
-            if last_tick.elapsed() >= tick_rate {
-                sys.refresh_all();
-                last_tick = Instant::now();
-            }
+            let tick_rate = Duration::from_millis(self.current_fetch_interval);
+            let timeout = tick_rate
+                .checked_sub(last_tick.elapsed())
+                .unwrap_or_else(|| Duration::from_secs(0));
 
-            terminal.draw(|frame| {
-                Self::render(
-                    &mut self,
-                    frame,
-                    sys,
-                    &mut show_popup,
-                    &mut network_manager,
-                    &mut sort_order,
-                )
-            })?;
-
-            // Ein Event lesen und dann abarbeiten
-            if event::poll(Duration::from_millis(500))? {
+            if crossterm::event::poll(timeout)? {
                 let evt = event::read()?;
                 match evt {
                     Event::Key(KeyEvent {
                         code: KeyCode::Char('q'),
                         ..
                     }) => break Ok(()),
+                    Event::Mouse(event::MouseEvent {
+                        kind: event::MouseEventKind::Up(..), // Use .. to ignore the MouseButton value
+                        column,
+                        row,
+                        ..
+                    }) => {
+                        let click_point = Rect::new(column, row, 1, 1);
+                        if click_point.intersects(self.minus_button_rect) {
+                            self.current_fetch_interval =
+                                self.current_fetch_interval.saturating_sub(100).max(100);
+                        } else if click_point.intersects(self.plus_button_rect) {
+                            self.current_fetch_interval =
+                                self.current_fetch_interval.saturating_add(100).min(60000);
+                        }
+                    }
                     Event::Mouse(event::MouseEvent {
                         kind: event::MouseEventKind::ScrollDown,
                         ..
@@ -200,24 +210,35 @@ impl App {
                         code: KeyCode::Left,
                         ..
                     }) => {
-                        self.horizontal_scroll = self.horizontal_scroll.saturating_sub(1);
-                        self.horizontal_scroll_state = self
-                            .horizontal_scroll_state
-                            .position(self.horizontal_scroll);
+                        self.current_fetch_interval =
+                            self.current_fetch_interval.saturating_sub(100).max(100);
                     }
                     Event::Key(KeyEvent {
                         code: KeyCode::Right,
                         ..
                     }) => {
-                        self.horizontal_scroll = self.horizontal_scroll.saturating_add(1);
-                        self.horizontal_scroll_state = self
-                            .horizontal_scroll_state
-                            .position(self.horizontal_scroll);
+                        self.current_fetch_interval =
+                            self.current_fetch_interval.saturating_add(100).min(60000);
                     }
-
                     _ => {}
                 }
             }
+
+            if last_tick.elapsed() >= tick_rate {
+                sys.refresh_all();
+                last_tick = Instant::now();
+            }
+
+            terminal.draw(|frame| {
+                Self::render(
+                    &mut self,
+                    frame,
+                    sys,
+                    &mut show_popup,
+                    &mut network_manager,
+                    &mut sort_order,
+                )
+            })?;
         }
     }
 
@@ -233,7 +254,6 @@ impl App {
         // Gesamten Bereich des Terminals abrufen
         let area = frame.area();
 
-        let current_time = Local::now().format("%H:%M:%S").to_string();
         // Äußeren Rahmen erstellen
         let outer_block = Block::default()
             .borders(Borders::ALL)
@@ -241,15 +261,6 @@ impl App {
             // Links oben: System Monitor
             .title(Span::styled("System Monitor", Style::default()))
             .title_alignment(Alignment::Left)
-            // Mitte oben: Aktuelle Zeit
-            .title_top(
-                Line::from(vec![
-                    Span::styled("".to_string(), Style::default()), // Leerer Span für Links
-                    Span::styled(current_time, Style::default()),   // Zeit in der Mitte
-                    Span::styled("".to_string(), Style::default()), // Leerer Span für Rechts
-                ])
-                .centered(),
-            )
             .title_bottom(
                 Line::from(vec![Span::styled(
                     format!("User: {}", get_current_user()),
@@ -265,10 +276,61 @@ impl App {
                 .right_aligned(),
             );
 
-        // Äußeren Rahmen rendern
         frame.render_widget(outer_block, area);
 
-        // Inneres Layout erstellen (innerhalb des äußeren Rahmens)
+        // Render the top bar content (time and fetch interval)
+        let top_bar_area = Rect::new(area.x + 1, area.y, area.width.saturating_sub(2), 1);
+
+        // Current Time (centered)
+        let current_time_str = Local::now().format("%H:%M:%S").to_string();
+        let time_paragraph = Paragraph::new(current_time_str).alignment(Alignment::Center);
+        frame.render_widget(time_paragraph, top_bar_area);
+
+        // Fetch Interval and Buttons (right-aligned)
+        let interval_display = format!("Fetch Interval: {}ms", self.current_fetch_interval);
+        let minus_btn_text = "[ - ]";
+        let plus_btn_text = "[ + ]";
+
+        // Calculate total width needed for right-aligned content
+        let total_right_content_width = minus_btn_text.len() as u16
+            + 1
+            + interval_display.len() as u16
+            + 1
+            + plus_btn_text.len() as u16; // +1 for spaces between elements
+
+        // Calculate starting X for right-aligned content
+        let right_content_start_x =
+            top_bar_area.x + top_bar_area.width.saturating_sub(total_right_content_width);
+        let y_pos = top_bar_area.y;
+
+        // Calculate Rects for buttons
+        self.minus_button_rect =
+            Rect::new(right_content_start_x, y_pos, minus_btn_text.len() as u16, 1);
+
+        self.plus_button_rect = Rect::new(
+            right_content_start_x
+                + minus_btn_text.len() as u16
+                + 1
+                + interval_display.len() as u16
+                + 1,
+            y_pos,
+            plus_btn_text.len() as u16,
+            1,
+        );
+
+        let fetch_interval_spans = Line::from(vec![
+            Span::styled(minus_btn_text, Style::default().fg(Color::Cyan)),
+            Span::raw(" "),
+            Span::styled(interval_display, Style::default().fg(Color::Green)),
+            Span::raw(" "),
+            Span::styled(plus_btn_text, Style::default().fg(Color::Cyan)),
+        ]);
+
+        let fetch_interval_paragraph =
+            Paragraph::new(fetch_interval_spans).alignment(Alignment::Right);
+        frame.render_widget(fetch_interval_paragraph, top_bar_area);
+
+        // Inneres Layout erstellen (within the outer frame)
         let inner_area = area.inner(Margin {
             vertical: 1,
             horizontal: 1,
@@ -285,7 +347,7 @@ impl App {
         //let combined_cpu_information = format!("{}\n{}", cpu_usage, cpu_core_usage);
 
         let cpu_block = Block::default()
-            .title("CPU Core Usage")
+            .title("CPU Core Usage ")
             .borders(Borders::ALL);
         //let cpu_widget = Paragraph::new(cpu_core_usage).block(cpu_block);
         let cpu_widget = Paragraph::new(cpu_core_usage)
@@ -296,9 +358,9 @@ impl App {
         frame.render_stateful_widget(
             Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .style(style::Color::LightBlue)
-                .begin_symbol(Some("∧")) // ↑
-                .end_symbol(Some("∨")) // ↓
-                .thumb_symbol("░"), // ░
+                .begin_symbol(Some("^")) // ^
+                .end_symbol(Some("v")) // v
+                .thumb_symbol("░"), //
             chunks[1].inner(Margin {
                 vertical: 1,
                 horizontal: 0,
@@ -320,7 +382,9 @@ impl App {
         frame.render_widget(cpu_gauge, chunks[0]);
 
         // Memory Block
-        let memory_block = Block::default().title("Memory Usage").borders(Borders::ALL);
+        let memory_block = Block::default()
+            .title("Memory Usage ")
+            .borders(Borders::ALL);
         let memory_table = ram_info_table(sys).block(memory_block);
         frame.render_widget(memory_table, chunks[3]);
 
@@ -338,13 +402,13 @@ impl App {
             .title_bottom(
                 Line::from(vec![
                     Span::styled("C", Style::default().fg(Color::Yellow)),
-                    Span::raw("PU───"),
+                    Span::raw("PU---"),
                     Span::styled("M", Style::default().fg(Color::Yellow)),
-                    Span::raw("emory───"),
+                    Span::raw("emory---"),
                     Span::styled("P", Style::default().fg(Color::Yellow)),
-                    Span::raw("ID───"),
+                    Span::raw("ID---"),
                     Span::styled("N", Style::default().fg(Color::Yellow)),
-                    Span::raw("ame───"),
+                    Span::raw("ame---"),
                 ])
                 .left_aligned(),
             )
@@ -425,7 +489,7 @@ impl App {
                 .title_top(
                     Line::from(vec![
                         Span::styled("".to_string(), Style::default()), // Leerer Span für Links
-                        Span::styled("Welcome to Luis Dashboard", Style::default()), // Zeit in der Mitte
+                        Span::styled("Welcome to Luis Dashboard ", Style::default()), // Zeit in der Mitte
                         Span::styled("".to_string(), Style::default()), // Leerer Span für Rechts
                     ])
                     .centered(),
@@ -433,7 +497,7 @@ impl App {
                 .title_bottom(
                     Line::from(vec![
                         Span::styled("".to_string(), Style::default()), // Leerer Span für Links
-                        Span::styled("Press Enter to close", Style::default()), // Zeit in der Mitte
+                        Span::styled("Press Enter to close ", Style::default()), // Zeit in der Mitte
                         Span::styled("".to_string(), Style::default()), // Leerer Span für Rechts
                     ])
                     .centered(),
@@ -457,15 +521,15 @@ impl App {
 fn system_uptime() -> String {
     let uptime = System::uptime();
     if uptime < 60 {
-        return format!("Uptime: {} seconds", uptime);
+        return format!("Uptime: {} seconds ", uptime);
     } else if uptime < 3600 {
         let minutes = uptime / 60;
-        return format!("Uptime: {} minutes", minutes);
+        return format!("Uptime: {} minutes ", minutes);
     } else if uptime < 86400 {
         let hours = uptime / 3600;
-        return format!("Uptime: {} hours", hours);
+        return format!("Uptime: {} hours ", hours);
     } else {
         let days = uptime / 86400;
-        return format!("Uptime: {} days", days);
+        return format!("Uptime: {} days ", days);
     }
 }
