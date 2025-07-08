@@ -4,11 +4,11 @@ use super::converter::byte_to_gib;
 use ratatui::prelude::Constraint;
 use ratatui::style::Color;
 use ratatui::style::Style;
+use ratatui::widgets::Cell;
 use ratatui::widgets::{Row, Table};
 use sysinfo::System;
 
 /// Returns total / used memory and swap / used swap information in a table format
-use ratatui::widgets::Cell;
 pub fn ram_info_table(sys: &System) -> Table<'static> {
     let rows = vec![
         Row::new(vec![

@@ -14,13 +14,10 @@ pub struct NetworkManager {
 
     previous_received: HashMap<String, u64>,
     previous_transmitted: HashMap<String, u64>,
-    // Für jedes Interface Tupel: (Download-Historie, Upload-Historie)
+    // For every Interface Tupel: (Download-History, Upload-History)
     network_history: HashMap<String, (Vec<(f64, f64)>, Vec<(f64, f64)>)>,
-    // Vector (da sich die Daten immer wieder ändern) und zweimal f64 für Zeit und Wert
-    // Diese Felder werden für die Anzeige im Diagramm verwendet
-    // Download wird positiv und Upload negativ skaliert, damit sie im Diagramm korrekt angezeigt
-    // werden können.
-    // Download nach oben, Upload nach unten.
+    // Vec<()> because the data changes over time
+    // f64 for time and the value for upload/download
     scaled_download: Vec<(f64, f64)>,
     scaled_upload: Vec<(f64, f64)>,
     time_counter: f64,
@@ -32,7 +29,7 @@ impl NetworkManager {
         let networks = Networks::new_with_refreshed_list();
         let mut network_history = HashMap::new();
 
-        // Initialisiere für jede gefundene Schnittstelle die leere Historie
+        // initializes every found interface with an empty history
         for (interface_name, _) in networks.iter() {
             network_history.insert(interface_name.to_string(), (Vec::new(), Vec::new()));
         }
