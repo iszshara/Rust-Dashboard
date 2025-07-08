@@ -2,13 +2,13 @@ To-Do
 
 #1 add a sorter for processes block (maybe sort algorithm + the ui for it) > ✅ both Tasks completed!
 
-#2 update the overall design (more color, etc.)
+#2 update the overall design (more color, etc.)     > ✅ Task completed!
 
 #3 add a manual/help page for the usable keys when ESC is pressed + the option to quit
 
-#4 add options for color choosing
+#4 add options for color choosing       > Task canceled/delayed
 
-#5 add option if user wants to see popup
+#5 add option if user wants to see popup        > Task canceled/delayed
 
 #6 add vertical bar chart for cpu core usage > ✅ Task completed!
 
@@ -18,11 +18,13 @@ To-Do
 
 #9 add Error message if the window scaling is too small to display data correctly
 
-#10 add kill option for processes
+#13 improve the way the fetching works
 
 MAYBE
 
-#11 maybe add some symbols (e.g. to up and download)
+#10 add kill option for processes
+
+#11 maybe add some symbols (e.g. to up and download)    > ✅ Task completed!
 
 #12 maybe add scrollbar for processes block         > ✅ Task completed!
 

@@ -127,13 +127,13 @@ impl NetworkManager {
 
         let datasets = vec![
             Dataset::default()
-                .name("Download")
+                .name("▼ Download")
                 .marker(symbols::Marker::Braille)
                 .graph_type(GraphType::Line)
                 .style(Style::default().green())
                 .data(&self.scaled_download),
             Dataset::default()
-                .name("Upload")
+                .name("▲ Upload")
                 .marker(symbols::Marker::Braille)
                 .graph_type(GraphType::Line)
                 .style(Style::default().red())

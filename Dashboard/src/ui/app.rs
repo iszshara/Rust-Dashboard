@@ -321,8 +321,8 @@ impl App {
 
         // Fetch Interval and Buttons (right-aligned)
         let interval_display = format!("Fetch Interval: {}ms", self.current_fetch_interval);
-        let minus_btn_text = "[ - ]";
-        let plus_btn_text = "[ + ]";
+        let minus_btn_text: &'static str = "[ ◄";
+        let plus_btn_text: &'static str = "► ]";
 
         // Calculate total width needed for right-aligned content
         let total_right_content_width = minus_btn_text.len() as u16
@@ -352,11 +352,11 @@ impl App {
         );
 
         let fetch_interval_spans = Line::from(vec![
-            Span::styled(minus_btn_text, Style::default().fg(Color::Cyan)),
+            Span::styled(minus_btn_text, Style::default().fg(Color::Yellow)),
             Span::raw(" "),
-            Span::styled(interval_display, Style::default().fg(Color::Green)),
+            Span::styled(interval_display, Style::default()),
             Span::raw(" "),
-            Span::styled(plus_btn_text, Style::default().fg(Color::Cyan)),
+            Span::styled(plus_btn_text, Style::default().fg(Color::Yellow)),
         ]);
 
         let fetch_interval_paragraph =
@@ -440,13 +440,13 @@ impl App {
             .title_bottom(
                 Line::from(vec![
                     Span::styled("C", Style::default().fg(Color::Yellow)),
-                    Span::raw("PU---"),
+                    Span::raw("PU───"),
                     Span::styled("M", Style::default().fg(Color::Yellow)),
-                    Span::raw("emory---"),
+                    Span::raw("emory───"),
                     Span::styled("P", Style::default().fg(Color::Yellow)),
-                    Span::raw("ID---"),
+                    Span::raw("ID───"),
                     Span::styled("N", Style::default().fg(Color::Yellow)),
-                    Span::raw("ame---"),
+                    Span::raw("ame"),
                 ])
                 .left_aligned(),
             )
