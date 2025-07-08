@@ -14,7 +14,7 @@ To-Do
 
 #7 add uptime to dashboard     > ✅ Task completed!
 
-#8 add fetch intervall, where the user can choose between 100ms and 1min (60000ms)
+#8 add fetch intervall, where the user can choose between 100ms and 1min (60000ms) > ✅ Task completed!
 
 #9 add Error message if the window scaling is too small to display data correctly
 
