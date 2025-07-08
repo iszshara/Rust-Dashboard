@@ -1,5 +1,4 @@
-use crate::backend::processes;
-use crate::backend::processes::SortOrder;
+use crate::backend::processes::{SortOrder, create_process_rows};
 use crate::backend::system_info::SystemInfo;
 use crate::{
     backend::{
@@ -12,9 +11,12 @@ use crate::{
 };
 use chrono::Local;
 use color_eyre::Result;
+use ratatui::layout::Constraint;
 use ratatui::style::Color;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::Scrollbar;
+use ratatui::widgets::{
+    Block, BorderType, Borders, Clear, Gauge, Paragraph, Scrollbar, Table, Wrap,
+};
 use ratatui::widgets::{ScrollbarOrientation, ScrollbarState};
 use ratatui::{
     DefaultTerminal, Frame,
@@ -23,18 +25,24 @@ use ratatui::{
     layout::Alignment,
     prelude::*,
     style::Style,
-    widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph, Wrap},
 };
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
+#[derive(PartialEq, Eq)]
+enum ActiveBlock {
+    Cpu,
+    Processes,
+}
+
 impl Default for App {
     fn default() -> Self {
         Self {
-            vertical_scroll_state: ScrollbarState::default(),
-            horizontal_scroll_state: ScrollbarState::default(),
-            vertical_scroll: 0,
-            horizontal_scroll: 0,
+            active_block: ActiveBlock::Cpu,
+            cpu_scroll_state: ScrollbarState::default(),
+            process_scroll_state: ScrollbarState::default(),
+            cpu_scroll: 0,
+            process_scroll: 0,
             current_fetch_interval: 1000, // Initial 1000ms
             minus_button_rect: Rect::default(),
             plus_button_rect: Rect::default(),
@@ -44,10 +52,11 @@ impl Default for App {
 
 #[allow(dead_code)] // used to get rid of annoying warnings
 struct App {
-    pub vertical_scroll_state: ScrollbarState,
-    pub horizontal_scroll_state: ScrollbarState,
-    pub vertical_scroll: usize,
-    pub horizontal_scroll: usize,
+    active_block: ActiveBlock,
+    cpu_scroll_state: ScrollbarState,
+    process_scroll_state: ScrollbarState,
+    cpu_scroll: usize,
+    process_scroll: usize,
     pub current_fetch_interval: u64,
     pub minus_button_rect: Rect,
     pub plus_button_rect: Rect,
@@ -68,6 +77,10 @@ struct App {
 /// let result = run(...) startet die Hauptschleife.
 /// Diese rendert die UI und aktualisiert die Systeminformationen in regelmäßigen Abständen
 /// Sie nimmt das Terminal und die Systeminformationen als Parameter entgegen
+///
+/// const var = 8;
+///
+///
 
 pub fn run_ui() -> Result<()> {
     color_eyre::install()?;
@@ -192,20 +205,40 @@ impl App {
                         };
                     }
                     Event::Key(KeyEvent {
-                        code: KeyCode::Up, ..
+                        code: KeyCode::Tab, ..
                     }) => {
-                        self.vertical_scroll = self.vertical_scroll.saturating_sub(1);
-                        self.vertical_scroll_state =
-                            self.vertical_scroll_state.position(self.vertical_scroll);
+                        self.active_block = match self.active_block {
+                            ActiveBlock::Cpu => ActiveBlock::Processes,
+                            ActiveBlock::Processes => ActiveBlock::Cpu,
+                        };
                     }
+                    Event::Key(KeyEvent {
+                        code: KeyCode::Up, ..
+                    }) => match self.active_block {
+                        ActiveBlock::Cpu => {
+                            self.cpu_scroll = self.cpu_scroll.saturating_sub(1);
+                            self.cpu_scroll_state = self.cpu_scroll_state.position(self.cpu_scroll);
+                        }
+                        ActiveBlock::Processes => {
+                            self.process_scroll = self.process_scroll.saturating_sub(1);
+                            self.process_scroll_state =
+                                self.process_scroll_state.position(self.process_scroll);
+                        }
+                    },
                     Event::Key(KeyEvent {
                         code: KeyCode::Down,
                         ..
-                    }) => {
-                        self.vertical_scroll = self.vertical_scroll.saturating_add(1);
-                        self.vertical_scroll_state =
-                            self.vertical_scroll_state.position(self.vertical_scroll);
-                    }
+                    }) => match self.active_block {
+                        ActiveBlock::Cpu => {
+                            self.cpu_scroll = self.cpu_scroll.saturating_add(1);
+                            self.cpu_scroll_state = self.cpu_scroll_state.position(self.cpu_scroll);
+                        }
+                        ActiveBlock::Processes => {
+                            self.process_scroll = self.process_scroll.saturating_add(1);
+                            self.process_scroll_state =
+                                self.process_scroll_state.position(self.process_scroll);
+                        }
+                    },
                     Event::Key(KeyEvent {
                         code: KeyCode::Left,
                         ..
@@ -338,22 +371,23 @@ impl App {
         let chunks = layout::terminal_layout(inner_area);
 
         // CPU Usage
-        //let cpu_usage = format_total_cpu_usage(sys);
         let cpu_core_usage = format_cpu_usage(sys);
-        self.vertical_scroll_state = self
-            .vertical_scroll_state
+        self.cpu_scroll_state = self
+            .cpu_scroll_state
             .content_length(sys.get_cpus().len() as usize);
-
-        //let combined_cpu_information = format!("{}\n{}", cpu_usage, cpu_core_usage);
 
         let cpu_block = Block::default()
             .title("CPU Core Usage ")
-            .borders(Borders::ALL);
-        //let cpu_widget = Paragraph::new(cpu_core_usage).block(cpu_block);
+            .borders(Borders::ALL)
+            .border_style(if self.active_block == ActiveBlock::Cpu {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default()
+            });
         let cpu_widget = Paragraph::new(cpu_core_usage)
             .block(cpu_block)
             .wrap(Wrap { trim: true })
-            .scroll((self.vertical_scroll as u16, 0));
+            .scroll((self.cpu_scroll as u16, 0));
         frame.render_widget(cpu_widget, chunks[1]);
         frame.render_stateful_widget(
             Scrollbar::new(ScrollbarOrientation::VerticalRight)
@@ -365,7 +399,7 @@ impl App {
                 vertical: 1,
                 horizontal: 0,
             }),
-            &mut self.vertical_scroll_state,
+            &mut self.cpu_scroll_state,
         );
 
         // CPU Gauge
@@ -397,6 +431,10 @@ impl App {
         frame.render_widget(network_widget.clone(), chunks[2]);
 
         // Processes Block
+        let process_rows = create_process_rows(sys, *sort_order);
+        let num_processes = process_rows.len();
+        self.process_scroll_state = self.process_scroll_state.content_length(num_processes);
+
         let processes_block = Block::default()
             .title("Processes")
             .title_bottom(
@@ -412,10 +450,45 @@ impl App {
                 ])
                 .left_aligned(),
             )
-            .borders(Borders::ALL);
+            .borders(Borders::ALL)
+            .border_style(if self.active_block == ActiveBlock::Processes {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default()
+            });
 
-        let processes_table = processes::create_process_table(sys, *sort_order);
-        frame.render_widget(processes_table.block(processes_block), chunks[4]); // oder welcher chunk auch immer für Prozesse verwendet wird
+        let table_height = chunks[4].height as usize - 2; // -2 for borders
+        let visible_rows = process_rows
+            .into_iter()
+            .skip(self.process_scroll)
+            .take(table_height);
+
+        let widths = [
+            Constraint::Length(8),  // PID
+            Constraint::Length(30), // Name
+            Constraint::Length(10), // Status
+            Constraint::Length(10), // CPU
+            Constraint::Length(12), // Memory
+        ];
+
+        let processes_table = Table::new(visible_rows, widths)
+            .column_spacing(1)
+            .style(Style::default().fg(Color::White))
+            .block(processes_block);
+
+        frame.render_widget(processes_table, chunks[4]);
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .style(style::Color::LightBlue)
+                .begin_symbol(Some("^")) // ^
+                .end_symbol(Some("v")) // v
+                .thumb_symbol("░"), //
+            chunks[4].inner(Margin {
+                vertical: 1,
+                horizontal: 0,
+            }),
+            &mut self.process_scroll_state,
+        );
 
         // Network Diagram Block
         let network_diagram = network_manager.get_network_widget();

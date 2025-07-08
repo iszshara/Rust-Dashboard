@@ -1,8 +1,7 @@
 use crate::backend::converter::byte_to_gib;
 use ratatui::{
-    layout::Constraint,
     style::{Color, Style},
-    widgets::{Cell, Row, Table},
+    widgets::{Cell, Row},
 };
 use sysinfo::{Pid, Process, System};
 
@@ -40,7 +39,7 @@ fn truncate_string(s: &str, max_length: usize) -> String {
     }
 }
 
-pub fn create_process_table(sys: &System, sort_order: SortOrder) -> Table<'static> {
+pub fn create_process_rows(sys: &System, sort_order: SortOrder) -> Vec<Row<'static>> {
     let mut processes: Vec<(&Pid, &Process)> = sys.processes().iter().collect();
     match sort_order {
         SortOrder::CpuAsc => {
@@ -100,14 +99,5 @@ pub fn create_process_table(sys: &System, sort_order: SortOrder) -> Table<'stati
             Cell::from(format!("{:.2} GB", byte_to_gib(process.memory()))),
         ])
     }));
-    let widths = [
-        Constraint::Length(8),  // PID
-        Constraint::Length(30), // Name
-        Constraint::Length(10), // Status
-        Constraint::Length(10), // CPU
-        Constraint::Length(12), // Memory
-    ];
-    Table::new(rows, widths)
-        .column_spacing(1)
-        .style(Style::default().fg(Color::White))
+    rows
 }
