@@ -22,8 +22,8 @@ To-Do
 
 MAYBE
 
-#11 maybe add some symbols (e.g. to up and download
+#11 maybe add some symbols (e.g. to up and download)
 
-#12 maybe add scrollbar for processes block
+#12 maybe add scrollbar for processes block         > ✅ Task completed!
 
 #13 maybe add option to choose between a second layout (or only one box at the time)
