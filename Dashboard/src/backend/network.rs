@@ -40,6 +40,7 @@ impl NetworkManager {
             .map(|(name, _)| name.to_string())
             .unwrap_or_default();
 
+        // Erstellen einer neuen Instanz von NetworkManager mit den initialisierten Werten
         Self {
             networks: Networks::new_with_refreshed_list(),
             previous_received: HashMap::new(),
@@ -51,15 +52,18 @@ impl NetworkManager {
             selected_interface,
         }
     }
-
+    // dient zur Änderung der aktuell ausgewählten Schnittstelle
+    // und aktualisiert die Historie für diese Schnittstelle.
     pub fn set_selected_interface(&mut self, interface: String) {
         self.selected_interface = interface;
     }
 
+    // Gibt eine Liste aller verfügbaren Netzwerk-Interfaces zurück.
     pub fn network_history_keys(&self) -> Vec<String> {
         self.network_history.keys().cloned().collect()
     }
 
+    // Gibt das aktuell ausgewählte Interface zurück.
     pub fn get_selected_interface(&self) -> &String {
         &self.selected_interface
     }
@@ -95,6 +99,10 @@ impl NetworkManager {
             self.network_history.get(&self.selected_interface).unwrap();
 
         // Bestimme den maximalen Wert, um die Skalierung zu ermitteln.
+        // in map wird mittels des "_" Platzhalters der Wert für den Zeitstempel
+        // ignoriert, da der Zeitstempel nicht relevant ist für den Maximalwert.
+        // Weiterhin wird dann der Körper des Closure, value.abs() aufgerufen, da wir immer einen absoluten Wert brauchen
+        // aufgrund der negativen Upload-Werte.
         let max_value = download_data
             .iter()
             .chain(upload_data.iter())
@@ -102,6 +110,7 @@ impl NetworkManager {
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(0.0);
 
+        // unit ist ein &'static str, da die Werte String-Literale sind und die Lifetime ist static, da die Werte so lange wie das Programm an sich lebt die Werte anzeigen soll.
         let (unit, scale_factor) = if max_value > 1024.0 * 1024.0 * 1024.0 {
             ("GB/s", 1024.0 * 1024.0 * 1024.0)
         } else if max_value > 1024.0 * 1024.0 {
@@ -195,7 +204,7 @@ impl NetworkManager {
             self.previous_transmitted
                 .insert(interface_name.to_string(), transmitted);
 
-            // Speichere Updates inklusive Interface-Namen, um sie später zu aktualisieren.
+            // Speichern von Updates inklusive Interface-Namen, um sie später zu aktualisieren.
             network_updates.push((interface_name.to_string(), received_diff, transmitted_diff));
 
             // Erzeuge den anzuzeigenden String für das Interface.

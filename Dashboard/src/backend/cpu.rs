@@ -40,7 +40,6 @@ pub fn format_total_cpu_usage(sys: &impl SystemInfo) -> String {
     total_cpu_usage
 }
 
-// Notiz: Es gibt noch Vendor ID
 /// nimmt nur den ersten CPU
 /// holt danach den Namen des ersten CPUs
 /// + Fallback, falls keine CPUs vorhanden sind
@@ -52,4 +51,3 @@ pub fn format_cpu_name(sys: &impl SystemInfo) -> String {
         .unwrap_or_else(|| "Unknown CPU".to_string());
     cpu_name
 }
-

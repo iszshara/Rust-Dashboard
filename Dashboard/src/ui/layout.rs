@@ -47,12 +47,24 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
         .split(lower_chunks[1]);
 
+    let right_divided_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage(50), // Memory Bereich
+                Constraint::Percentage(50), // Prozesse Bereich
+            ]
+            .as_ref(),
+        )
+        .split(right_chunks[0]);
+
     vec![
-        main_chunks[0], // Gauge Bar
-        left_chunks[0], // CPU Bereich
-        left_chunks[1], // Network Bereich
-        right_chunks[0], // Memory Bereich
-        right_chunks[1], // Prozesse Bereich
-        left_chunks[2], // Network Diagram Bereich
+        main_chunks[0],          // Gauge Bar
+        left_chunks[0],          // CPU Bereich
+        left_chunks[1],          // Network Bereich
+        right_divided_chunks[0], // Memory Bereich
+        right_chunks[1],         // Prozesse Bereich
+        left_chunks[2],          // Network Diagram Bereich
+        right_divided_chunks[1], // System Info
     ]
 }

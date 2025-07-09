@@ -1,3 +1,4 @@
+use crate::backend::host::host_info_table;
 use crate::backend::processes::{SortOrder, create_process_rows};
 use crate::backend::system_info::SystemInfo;
 use crate::{
@@ -494,6 +495,13 @@ impl App {
         let network_diagram = network_manager.get_network_widget();
         frame.render_widget(network_diagram, chunks[5]);
 
+        // Host Info Block
+        let host_info_block = Block::default()
+            .title("Host System Information ")
+            .borders(Borders::ALL);
+        let host_info_table = host_info_table().block(host_info_block);
+        frame.render_widget(host_info_table, chunks[6]);
+
         struct Popup<'a> {
             title: Line<'a>,
             content: Text<'a>,
@@ -532,8 +540,8 @@ impl App {
         }
 
         if *show_popup {
-            let popup_width = 35;
-            let popup_height = 5;
+            let popup_width: u16 = 35;
+            let popup_height: u16 = 5;
 
             // Zentriertes Popup-Bereich berechnen
             let popup_area = Rect::new(
@@ -558,11 +566,10 @@ impl App {
             }
 
             let popup_block = Block::default()
-                //.title("Welcome to the Rust Dashboard")
                 .title_top(
                     Line::from(vec![
                         Span::styled("".to_string(), Style::default()), // Leerer Span für Links
-                        Span::styled("Welcome to Luis Dashboard ", Style::default()), // Zeit in der Mitte
+                        Span::styled("Welcome to the Dashboard ", Style::default()), // Zeit in der Mitte
                         Span::styled("".to_string(), Style::default()), // Leerer Span für Rechts
                     ])
                     .centered(),
