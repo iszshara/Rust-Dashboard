@@ -29,7 +29,7 @@ pub fn host_info_table() -> Table<'static> {
             Cell::from(sysinfo::System::os_version().unwrap_or_else(|| "Unknown OS".to_string())),
         ]),
         Row::new(vec![
-            Cell::from("System Host Name"),
+            Cell::from("Host Name"),
             Cell::from(sysinfo::System::host_name().unwrap_or_else(|| "Unknown Host".to_string())),
         ]),
     ];

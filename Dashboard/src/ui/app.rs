@@ -30,6 +30,9 @@ use ratatui::{
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
+const MIN_WIDTH: u16 = 110;
+const MIN_HEIGHT: u16 = 24;
+
 #[derive(PartialEq, Eq)]
 enum ActiveBlock {
     Cpu,
@@ -264,14 +267,66 @@ impl App {
             }
 
             terminal.draw(|frame| {
-                Self::render(
-                    &mut self,
-                    frame,
-                    sys,
-                    &mut show_popup,
-                    &mut network_manager,
-                    &mut sort_order,
-                )
+                let size = frame.area();
+                if size.width < MIN_WIDTH || size.height < MIN_HEIGHT {
+                    let current_width_style = if size.width >= MIN_WIDTH {
+                        Style::default().fg(Color::Green)
+                    } else {
+                        Style::default().fg(Color::Red)
+                    };
+                    let current_height_style = if size.height >= MIN_HEIGHT {
+                        Style::default().fg(Color::Green)
+                    } else {
+                        Style::default().fg(Color::Red)
+                    };
+
+                    let message_text = Text::from(vec![
+                        Line::from(Span::styled(
+                            "Terminalfenster ist zu klein!",
+                            Style::default().fg(Color::Red),
+                        )),
+                        Line::from(""), // Empty line for spacing
+                        Line::from(vec![
+                            Span::raw("Aktuelle Größe: "),
+                            Span::styled(format!("{}", size.width), current_width_style),
+                            Span::raw("x"),
+                            Span::styled(format!("{}", size.height), current_height_style),
+                        ]),
+                        Line::from(vec![
+                            Span::raw("Benötigt: "),
+                            Span::styled(
+                                format!("{}x{}", MIN_WIDTH, MIN_HEIGHT),
+                                Style::default().fg(Color::Yellow),
+                            ),
+                        ]),
+                        Line::from(""), // Empty line for spacing
+                        Line::from(Span::raw("Bitte Terminalgröße anpassen.")),
+                    ])
+                    .alignment(Alignment::Center);
+
+                    let paragraph = Paragraph::new(message_text)
+                        .alignment(Alignment::Center)
+                        .wrap(Wrap { trim: true })
+                        .block(
+                            Block::default()
+                                .borders(Borders::ALL)
+                                .border_type(BorderType::Rounded)
+                                .title("Error")
+                                .title_alignment(Alignment::Center)
+                                .style(Style::default().fg(Color::Red)),
+                        );
+                    frame.render_widget(Clear, size);
+                    frame.render_widget(paragraph, size);
+                } else {
+                    Self::render(
+                        &mut self,
+                        frame,
+                        sys,
+                        &mut show_popup,
+                        &mut network_manager,
+                        &mut sort_order,
+                    )
+                }
             })?;
         }
     }
