@@ -1,6 +1,6 @@
+//! This module defines the layout for the terminal UI of the Dashboard.
+/// The function 'terminal_layout', divides the terminal area into several sections called chunks.
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-
-//use crate::main;
 
 pub fn terminal_layout(area: Rect) -> Vec<Rect> {
     // Hautplayout was den Bereich in zwei Bereiche teilt
@@ -9,8 +9,8 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .margin(1)
         .constraints(
             [
-                Constraint::Length(3),       // Gauge Bar oben
-                Constraint::Percentage(100), // Rest darunter
+                Constraint::Length(3),       // Gauge Bar top
+                Constraint::Percentage(100), // everything else below
             ]
             .as_ref(),
         )
@@ -21,8 +21,8 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(50), // Linker Bereich
-                Constraint::Percentage(50), // Rechter Bereich
+                Constraint::Percentage(50), // left area
+                Constraint::Percentage(50), // right area
             ]
             .as_ref(),
         )
@@ -33,9 +33,9 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Percentage(30), // CPU Bereich
-                Constraint::Percentage(20), // Network
-                Constraint::Percentage(50), // Network Diagram
+                Constraint::Percentage(30), // CPU area
+                Constraint::Percentage(20), // Network area
+                Constraint::Percentage(50), // Network diagram
             ]
             .as_ref(),
         )
@@ -51,8 +51,8 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(50), // Memory Bereich
-                Constraint::Percentage(50), // Prozesse Bereich
+                Constraint::Percentage(50), // Memory area
+                Constraint::Percentage(50), // Process area
             ]
             .as_ref(),
         )
@@ -60,11 +60,11 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
 
     vec![
         main_chunks[0],          // Gauge Bar
-        left_chunks[0],          // CPU Bereich
-        left_chunks[1],          // Network Bereich
-        right_divided_chunks[0], // Memory Bereich
-        right_chunks[1],         // Prozesse Bereich
-        left_chunks[2],          // Network Diagram Bereich
-        right_divided_chunks[1], // System Info
+        left_chunks[0],          // CPU area
+        left_chunks[1],          // Network area
+        right_divided_chunks[0], // Memory area
+        right_chunks[1],         // Prozesse area
+        left_chunks[2],          // Network Diagram
+        right_divided_chunks[1], // System Info area
     ]
 }

@@ -30,7 +30,9 @@ impl Default for SortOrder {
         SortOrder::CpuDesc // Standard-Sortierung nach CPU-Auslastung absteigend
     }
 }
-
+/// s is short for string slice (the result is better performance bc, the Compiler is told to not look at the whole string, but only the relevant part).
+/// It then gets converted into a String to return a new owned String.
+/// Short: Truncates a string to a maximum length and appends "..." if it exceeds that length.
 fn truncate_string(s: &str, max_length: usize) -> String {
     if s.len() <= max_length {
         s.to_string()
@@ -38,7 +40,8 @@ fn truncate_string(s: &str, max_length: usize) -> String {
         format!("{}...", &s[..max_length - 3])
     }
 }
-
+/// This function creates a vector of rows representing the processes in the system.
+/// It sorts the processes based on the specified `SortOrder` and formats them into rows for display.
 pub fn create_process_rows(sys: &System, sort_order: SortOrder) -> Vec<Row<'static>> {
     let mut processes: Vec<(&Pid, &Process)> = sys.processes().iter().collect();
     match sort_order {
@@ -78,7 +81,7 @@ pub fn create_process_rows(sys: &System, sort_order: SortOrder) -> Vec<Row<'stat
         }
     }
 
-    // Header-Zeile erstellen
+    // create header row
     let header = Row::new(vec![
         Cell::from("PID"),
         Cell::from("Name"),
@@ -88,8 +91,8 @@ pub fn create_process_rows(sys: &System, sort_order: SortOrder) -> Vec<Row<'stat
     ])
     .style(Style::default().fg(Color::Yellow));
 
-    // Prozess-Daten in Tabellenzeilen umwandeln
-    let mut rows = vec![header]; // Füge Header als erste Zeile ein
+    // converts the process data into rows for the table
+    let mut rows = vec![header]; // adds header in the first row
     rows.extend(processes.iter().map(|(pid, process)| {
         Row::new(vec![
             Cell::from(pid.to_string()),

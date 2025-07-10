@@ -27,7 +27,6 @@ use ratatui::{
     prelude::*,
     style::Style,
 };
-// use std::option;
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
@@ -67,21 +66,21 @@ struct App {
     pub plus_button_rect: Rect,
 }
 
-/// run_ui() ist der Einstiegspunkt für die UI des Terminals.
-/// Sie initialisiert die notwendigen Komponenten und startet die Hauptschleife,
-/// die das Terminal-UI rendert und aktualisiert
+/// run_ui() is the entry point for the terminal UI.
+/// It initializes the necessary components and starts the main loop,
+/// which renders and updates the terminal UI.
 ///
-/// color_eyre wird aufgerufen, um die Fehlerberichtserstattung zu konfigurieren
+/// color_eyre is called to configure error reporting.
 ///
-/// ratatui::init() wird verwendet, um das Terminal für die Anzeige vorzubereiten.
+/// ratatui::init() is used to prepare the terminal for display.
 ///
 /// let mut sys = System::new_all();
 /// sys.refresh_all();
-/// erstellt ein neues Systemobjekt, welches Daten über das System sammelt
+/// creates a new System object that collects data about the system.
 ///
-/// let result = run(...) startet die Hauptschleife.
-/// Diese rendert die UI und aktualisiert die Systeminformationen in regelmäßigen Abständen
-/// Sie nimmt das Terminal und die Systeminformationen als Parameter entgegen
+/// let result = run(...) starts the main loop.
+/// It renders the UI and updates the system information at regular intervals.
+/// It takes the terminal and system information as parameters.
 
 pub fn run_ui() -> Result<()> {
     color_eyre::install()?;
@@ -96,10 +95,10 @@ pub fn run_ui() -> Result<()> {
     app_result
 }
 
-/// Runtime function to render the Terminal and to refresh it
-/// setzt eine Anfangs- und Endzeitpunkts Tick Rate fest
-/// das User Interface wird in einer Schleife dann in dem jeweiligen Intervall immer neu gerendert mit der Information zu zB CPU Auslastung
-/// Das wird unterbrochen wenn es innerhalb von einer Zeitspanne von 50 ms ein "KeyEvent" gibt, bei dem definiert wurde das 'q' für das Beende der Schleife steht
+/// Runtime function to render the Terminal and to refresh it.
+/// It sets an initial and final tick rate.
+/// The user interface is then re-rendered in a loop at the respective interval with information such as CPU usage.
+/// This is interrupted if there is a "KeyEvent" within a 50 ms time span, where 'q' is defined to exit the loop.
 impl App {
     pub fn run(mut self, mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
         // Disable mouse capture to prevent performance issues with mouse wheel
@@ -285,25 +284,25 @@ impl App {
 
                     let message_text = Text::from(vec![
                         Line::from(Span::styled(
-                            "Terminalfenster ist zu klein!",
+                            "Terminal window is too small!",
                             Style::default().fg(Color::Red),
                         )),
                         Line::from(""), // Empty line for spacing
                         Line::from(vec![
-                            Span::raw("Aktuelle Größe: "),
+                            Span::raw("Current size: "),
                             Span::styled(format!("{}", size.width), current_width_style),
                             Span::raw("x"),
                             Span::styled(format!("{}", size.height), current_height_style),
                         ]),
                         Line::from(vec![
-                            Span::raw("Benötigt: "),
+                            Span::raw("Required: "),
                             Span::styled(
                                 format!("{}x{}", MIN_WIDTH, MIN_HEIGHT),
                                 Style::default().fg(Color::Yellow),
                             ),
                         ]),
                         Line::from(""), // Empty line for spacing
-                        Line::from(Span::raw("Bitte Terminalgröße anpassen.")),
+                        Line::from(Span::raw("Please adjust terminal size.")),
                     ])
                     .alignment(Alignment::Center);
 
@@ -335,7 +334,7 @@ impl App {
         }
     }
 
-    /// render() zeichnet den Rahmen der TUI App und erstellt verschiedene Objekte wie zB Paragraphen, Blöcke, etc.
+    /// render() draws the frame of the TUI app and creates various objects such as paragraphs, blocks, etc.
     fn render(
         &mut self,
         frame: &mut Frame,
@@ -345,14 +344,14 @@ impl App {
         sort_order: &mut SortOrder,
         show_manual: &mut bool,
     ) {
-        // Gesamten Bereich des Terminals abrufen
+        // Get the entire terminal area
         let area = frame.area();
 
-        // Äußeren Rahmen erstellen
+        // Create outer frame
         let outer_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            // Links oben: System Monitor
+            // Top left: System Monitor
             .title(Span::styled("System Monitor", Style::default()))
             .title_alignment(Alignment::Left)
             .title_bottom(
@@ -424,11 +423,11 @@ impl App {
             Paragraph::new(fetch_interval_spans).alignment(Alignment::Right);
         frame.render_widget(fetch_interval_paragraph, top_bar_area);
 
-        // Inneres Layout erstellen (within the outer frame)
+        // Create inner layout (within the outer frame)
         let inner_area = area.inner(Margin {
             vertical: 1,
             horizontal: 1,
-        }); // Platz für den Rahmen lassen
+        }); // Leave space for the frame
         let chunks = layout::terminal_layout(inner_area);
 
         // CPU Usage
@@ -584,7 +583,7 @@ impl App {
 
         impl Widget for Popup<'_> {
             fn render(self, area: Rect, buf: &mut Buffer) {
-                // sicherstellen dass die Zellen unter dem Popup gecleared werden um zu verhindern das der Content außerhalb der Box ist
+                // ensure that the cells under the popup are cleared to prevent the content from being outside the box
                 Clear.render(area, buf);
                 let block = Block::new()
                     .title(self.title)
@@ -600,15 +599,15 @@ impl App {
         }
 
         if *show_popup {
-            let popup_width: u16 = 35;
-            let popup_height: u16 = 5;
+            const POPUP_WIDTH: u16 = 35;
+            const POPUP_HEIGHT: u16 = 5;
 
-            // Zentriertes Popup-Bereich berechnen
+            // Calculate centered popup area
             let popup_area = Rect::new(
-                (area.width.saturating_sub(popup_width)) / 2,
-                (area.height.saturating_sub(popup_height)) / 2,
-                popup_width,
-                popup_height,
+                (area.width.saturating_sub(POPUP_WIDTH)) / 2,
+                (area.height.saturating_sub(POPUP_HEIGHT)) / 2,
+                POPUP_WIDTH,
+                POPUP_HEIGHT,
             );
 
             let username = format!("Current User: {}", get_current_user());
@@ -617,10 +616,10 @@ impl App {
             content.push_str(&format!(
                 "{:-^width$}\n",
                 username,
-                width = popup_width as usize - 2
+                width = POPUP_WIDTH as usize - 2
             ));
 
-            let empty_lines = popup_height as usize - 4;
+            let empty_lines = POPUP_HEIGHT as usize - 4;
             for _ in 0..empty_lines {
                 content.push('\n');
             }
@@ -628,17 +627,17 @@ impl App {
             let popup_block = Block::default()
                 .title_top(
                     Line::from(vec![
-                        Span::styled("".to_string(), Style::default()), // Leerer Span für Links
-                        Span::styled("Welcome to the Dashboard ", Style::default()), // Zeit in der Mitte
-                        Span::styled("".to_string(), Style::default()), // Leerer Span für Rechts
+                        Span::styled("".to_string(), Style::default()), // Empty span for left
+                        Span::styled("Welcome to the Dashboard ", Style::default()), // Time in the middle
+                        Span::styled("".to_string(), Style::default()), // Empty span for right
                     ])
                     .centered(),
                 )
                 .title_bottom(
                     Line::from(vec![
-                        Span::styled("".to_string(), Style::default()), // Leerer Span für Links
-                        Span::styled("Press Enter to close ", Style::default()), // Zeit in der Mitte
-                        Span::styled("".to_string(), Style::default()), // Leerer Span für Rechts
+                        Span::styled("".to_string(), Style::default()), // Empty span for left
+                        Span::styled("Press Enter to close ", Style::default()), // Time in the middle
+                        Span::styled("".to_string(), Style::default()), // Empty span for right
                     ])
                     .centered(),
                 )
@@ -657,9 +656,6 @@ impl App {
         }
 
         if *show_manual {
-            // let option_width: u16 = 40;
-            // let option_height: u16 = 20;
-
             let manual_area = Rect::new(
                 (area.width.saturating_sub(60)) / 2,
                 (area.height.saturating_sub(20)) / 2,
@@ -678,8 +674,8 @@ impl App {
                 "Use Left/Right arrows to adjust fetch interval\n",
                 "Press 'q' to quit the application\n",
             ];
-            // es wird der &&str erwartet, da iter über die Elemente der Vec iteriert und damit eine Referenz auf jedes Element erstellt wird.
-            // Nun muss eine Referenz auf diese Referenz erstellt werden um den Wert zu bekommen.
+            // &&str is expected here, because iter iterates over the elements of the Vec and thus creates a reference to each element.
+            // Now a reference to this reference must be created to get the value.
             let manual_content = manual_description
                 .iter()
                 .map(|s: &&str| Line::from(Span::raw(*s)))
