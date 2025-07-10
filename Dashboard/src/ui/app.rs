@@ -27,6 +27,7 @@ use ratatui::{
     prelude::*,
     style::Style,
 };
+// use std::option;
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
@@ -81,10 +82,6 @@ struct App {
 /// let result = run(...) startet die Hauptschleife.
 /// Diese rendert die UI und aktualisiert die Systeminformationen in regelmäßigen Abständen
 /// Sie nimmt das Terminal und die Systeminformationen als Parameter entgegen
-///
-/// const var = 8;
-///
-///
 
 pub fn run_ui() -> Result<()> {
     color_eyre::install()?;
@@ -115,6 +112,7 @@ impl App {
         let mut show_popup = true;
         let mut network_manager = NetworkManager::new();
         let mut sort_order = SortOrder::default();
+        let mut show_option = false;
 
         loop {
             let tick_rate = Duration::from_millis(self.current_fetch_interval);
@@ -257,6 +255,11 @@ impl App {
                         self.current_fetch_interval =
                             self.current_fetch_interval.saturating_add(100).min(60000);
                     }
+                    Event::Key(KeyEvent {
+                        code: KeyCode::Esc, ..
+                    }) => {
+                        show_option = !show_option;
+                    }
                     _ => {}
                 }
             }
@@ -325,6 +328,7 @@ impl App {
                         &mut show_popup,
                         &mut network_manager,
                         &mut sort_order,
+                        &mut show_option,
                     )
                 }
             })?;
@@ -339,6 +343,7 @@ impl App {
         show_popup: &mut bool,
         network_manager: &mut NetworkManager,
         sort_order: &mut SortOrder,
+        show_option: &mut bool,
     ) {
         // Gesamten Bereich des Terminals abrufen
         let area = frame.area();
@@ -649,6 +654,52 @@ impl App {
 
             frame.render_widget(Clear, popup_area);
             frame.render_widget(popup_paragraph, popup_area);
+        }
+
+        if *show_option {
+            // let option_width: u16 = 40;
+            // let option_height: u16 = 20;
+
+            let option_area = Rect::new(
+                (area.width.saturating_sub(60)) / 2,
+                (area.height.saturating_sub(20)) / 2,
+                60,
+                20,
+            );
+
+            let description_of_options = vec![
+                "Press 'i' to switch network interface\n",
+                "Press 'c' to sort by CPU usage\n",
+                "Press 'm' to sort by Memory usage\n",
+                "Press 'p' to sort by PID\n",
+                "Press 'n' to sort by Name\n",
+                "Press 'Tab' to switch between CPU and Processes view\n",
+                "Use Up/Down arrows to scroll through CPU or Processes\n",
+                "Use Left/Right arrows to adjust fetch interval\n",
+                "Press 'q' to quit the application\n",
+            ];
+            // es wird der &&str erwartet, da iter über die Elemente der Vec iteriert und damit eine Referenz auf jedes Element erstellt wird.
+            // Nun muss eine Referenz auf diese Referenz erstellt werden um den Wert zu bekommen.
+            let options_content = description_of_options
+                .iter()
+                .map(|s: &&str| Line::from(Span::raw(*s)))
+                .collect::<Vec<_>>();
+
+            let option_block = Block::default()
+                .title("Options")
+                .title_alignment(Alignment::Center)
+                .title_bottom("Press 'Esc' to close")
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::LightBlue));
+
+            let options_paragraph = Paragraph::new(options_content)
+                .block(option_block)
+                .wrap(Wrap { trim: true })
+                .style(Style::default().fg(Color::White))
+                .alignment(Alignment::Left);
+            frame.render_widget(Clear, option_area);
+            frame.render_widget(options_paragraph, option_area);
         }
     }
 }
