@@ -112,7 +112,7 @@ impl App {
         let mut show_popup = true;
         let mut network_manager = NetworkManager::new();
         let mut sort_order = SortOrder::default();
-        let mut show_option = false;
+        let mut show_manual = false;
 
         loop {
             let tick_rate = Duration::from_millis(self.current_fetch_interval);
@@ -258,7 +258,7 @@ impl App {
                     Event::Key(KeyEvent {
                         code: KeyCode::Esc, ..
                     }) => {
-                        show_option = !show_option;
+                        show_manual = !show_manual;
                     }
                     _ => {}
                 }
@@ -328,7 +328,7 @@ impl App {
                         &mut show_popup,
                         &mut network_manager,
                         &mut sort_order,
-                        &mut show_option,
+                        &mut show_manual,
                     )
                 }
             })?;
@@ -343,7 +343,7 @@ impl App {
         show_popup: &mut bool,
         network_manager: &mut NetworkManager,
         sort_order: &mut SortOrder,
-        show_option: &mut bool,
+        show_manual: &mut bool,
     ) {
         // Gesamten Bereich des Terminals abrufen
         let area = frame.area();
@@ -656,18 +656,18 @@ impl App {
             frame.render_widget(popup_paragraph, popup_area);
         }
 
-        if *show_option {
+        if *show_manual {
             // let option_width: u16 = 40;
             // let option_height: u16 = 20;
 
-            let option_area = Rect::new(
+            let manual_area = Rect::new(
                 (area.width.saturating_sub(60)) / 2,
                 (area.height.saturating_sub(20)) / 2,
                 60,
                 20,
             );
 
-            let description_of_options = vec![
+            let manual_description = vec![
                 "Press 'i' to switch network interface\n",
                 "Press 'c' to sort by CPU usage\n",
                 "Press 'm' to sort by Memory usage\n",
@@ -680,12 +680,12 @@ impl App {
             ];
             // es wird der &&str erwartet, da iter über die Elemente der Vec iteriert und damit eine Referenz auf jedes Element erstellt wird.
             // Nun muss eine Referenz auf diese Referenz erstellt werden um den Wert zu bekommen.
-            let options_content = description_of_options
+            let manual_content = manual_description
                 .iter()
                 .map(|s: &&str| Line::from(Span::raw(*s)))
                 .collect::<Vec<_>>();
 
-            let option_block = Block::default()
+            let manual_block = Block::default()
                 .title("Options")
                 .title_alignment(Alignment::Center)
                 .title_bottom("Press 'Esc' to close")
@@ -693,13 +693,13 @@ impl App {
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(Color::LightBlue));
 
-            let options_paragraph = Paragraph::new(options_content)
-                .block(option_block)
+            let manual_paragraph = Paragraph::new(manual_content)
+                .block(manual_block)
                 .wrap(Wrap { trim: true })
                 .style(Style::default().fg(Color::White))
                 .alignment(Alignment::Left);
-            frame.render_widget(Clear, option_area);
-            frame.render_widget(options_paragraph, option_area);
+            frame.render_widget(Clear, manual_area);
+            frame.render_widget(manual_paragraph, manual_area);
         }
     }
 }
