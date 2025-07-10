@@ -4,7 +4,7 @@ To-Do
 
 #2 update the overall design (more color, etc.)     > ✅ Task completed!
 
-#3 add a manual/help page for the usable keys when ESC is pressed + the option to quit
+#3 add a manual/help page for the usable keys when ESC is pressed + the option to quit  > ✅ Task completed!
 
 #4 add options for color choosing       > Task canceled/delayed
 
