@@ -18,7 +18,24 @@ To-Do
 
 #9 add Error message if the window scaling is too small to display data correctly   > ✅ Task completed!
 
-#13 improve the way the fetching works
+#13 improve the way the fetching works(
+   1. Introduce Dependencies: add the tokio crate for asynchronous
+       runtime and its multi-threaded capabilities.
+   2. Create a Shared Data Store: define new struct to hold
+      application's state (CPU data, process lists, etc.). This store will
+      be wrapped in Arc<Mutex<...>> to allow safe, shared access between
+      the data-fetching thread and the UI thread.
+   3. Spawn a Background Fetching Task: A dedicated tokio task will be
+      created. It will loop, periodically call sys.refresh_all(), and
+      update the shared data store.
+   4. Decouple Input Handling: User input will be handled in a separate
+      task that sends events to the main UI loop through a channel,
+      preventing any input lag.
+   5. Adapt the Main UI Loop: The main loop will no longer fetch data
+      directly. Instead, it will listen for events and, on every "tick," it
+       will lock the shared data store to get the latest information for
+      rendering.)
+
 
 MAYBE
 
