@@ -3,7 +3,10 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub fn terminal_layout(area: Rect) -> Vec<Rect> {
-    // Hautplayout was den Bereich in zwei Bereiche teilt
+    // Main Layout for the terminal
+    // It divides the terminal into two main parts:
+    // 1. A top section for the Gauge Bar
+    // 2. A bottom section that is further divided into left and right parts
     let main_chunks = Layout::default()
         .direction(Direction::Vertical) // Zuerst vertical teilen
         .margin(1)
@@ -16,7 +19,7 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         )
         .split(area);
 
-    // Horizontale Aufteilung des unteren Bereichs
+    // Horizontal layout for the lower part of the terminal
     let lower_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -28,7 +31,8 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         )
         .split(main_chunks[1]);
 
-    // Linke Seite aufteilen
+    // Divide the left side into three areas
+    // The first area is for CPU, the second for Network, and the third for Network
     let left_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
@@ -41,12 +45,13 @@ pub fn terminal_layout(area: Rect) -> Vec<Rect> {
         )
         .split(lower_chunks[0]);
 
-    // Rechte Seite aufteilen
+    // Divide the right side into two areas
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
         .split(lower_chunks[1]);
 
+    // Divide the right side further into two areas
     let right_divided_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(

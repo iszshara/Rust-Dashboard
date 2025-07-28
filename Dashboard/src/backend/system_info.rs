@@ -1,18 +1,21 @@
-//! Dokumentation für den SystemInfo Trait und seine Implementierung
+//! Documentation for the SystemInfo Trait and its Implementation
+///
 /// ''' pub trait SystemInfo '''
-/// Was es ist:
-/// Dies ist ein Trait. In Rust definieren Traits ein Set von Verhaltensweisen (Methoden), die ein Typ implementieren kann.
-/// Hier definiert man, dass jeder Typ, der SystemInfo implementiert, eine Methode get_cpus
-/// (die eine Liste von  cpu_info::Cpu-Objektee zurückgibt) und global_cpu_usage (die die globale Cpu-Auslastung zurückgibt) haben muss.
+/// What it is:
+/// This is a trait. In Rust, traits define a set of behaviors (methods) that a type can implement.
+/// Here, it is defined that any type that implements SystemInfo must have a get_cpus method
+/// (which returns a list of cpu_info::Cpu objects) and a global_cpu_usage method (which returns the global CPU usage).
 ///
 /// ''' impl SystemInfo for System '''
-/// Was es ist: Dies ist die Implementierung des SystemInfo-Traits für die konkrete sysinfo::System Struktur.
-/// Hier wird definiert, wie eine echte sysinfo::System-Instanz die Methoden des SystemInfo-Traits ausführt.
-/// Es wandelt die sysinfo::Cpu-Objekte in cpu_info::Cpu-Objekte um.
+/// What it is: This is the implementation of the SystemInfo trait for the concrete sysinfo::System struct.
+/// It defines how a real sysinfo::System instance executes the methods of the SystemInfo trait.
+/// It converts the sysinfo::Cpu objects into cpu_info::Cpu objects.
 ///
-/// Warum es erstellt wurde: Dies ist der Kern der Testbarkeit. Anstatt die Funktionen direkt von sysinfo::System abhängig zu machen, werden sie von jedem Typ abhängig, der das SystemInfo-Traint implementiert (sys: &impl SystemInfo).
-/// Das nennt man Dependency Injection.
-/// Im Produktivcode wird sysinfo::System verwendet, aber im Testcode wird die Mock-Implementierung verwendet.
+/// Why it was created: This is the core of testability. Instead of making the functions directly
+/// dependent on sysinfo::System, they are made dependent on any type that implements the SystemInfo
+/// trait (sys: &impl SystemInfo).
+/// This is called Dependency Injection.
+/// In production code, sysinfo::System is used, but in test code, the mock implementation is used.
 use super::cpu_info;
 use sysinfo::System;
 

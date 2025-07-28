@@ -43,7 +43,7 @@ impl Default for NetworkManager {
             .map(|(name, _)| name.to_string())
             .unwrap_or_default();
 
-        // Erstellen einer neuen Instanz von NetworkManager mit den initialisierten Werten
+        // create a new instance of NetworkManager with the initialized values
         Self {
             networks: Networks::new_with_refreshed_list(),
             previous_received: HashMap::new(),
@@ -58,23 +58,27 @@ impl Default for NetworkManager {
 }
 
 impl NetworkManager {
-    // dient zur Änderung der aktuell ausgewählten Schnittstelle
-    // und aktualisiert die Historie für diese Schnittstelle.
+    // This setter-method is used to change the currently selected interface
+    // and update the history for this interface.
     pub fn set_selected_interface(&mut self, interface: String) {
         self.selected_interface = interface;
     }
 
-    // Gibt eine Liste aller verfügbaren Netzwerk-Interfaces zurück.
+    // This getter-method returns the keys of the network history map,
     pub fn network_history_keys(&self) -> Vec<String> {
         self.network_history.keys().cloned().collect()
     }
 
-    // Gibt das aktuell ausgewählte Interface zurück.
+    // This getter-method returns the currently selected interface.
     pub fn get_selected_interface(&self) -> &String {
         &self.selected_interface
     }
 
-    // Aktualisiert die Netzwerkdaten für ein bestimmtes Interface.
+    // The update_network_data method updates the network history for the currently selected interface.
+    // It takes the received and transmitted data differences and updates the history.
+    // The time_counter is incremented to keep track of the time for the chart.
+    // It also ensures that the history does not exceed 50 data points.
+    // This method is called whenever new network data is available.
     pub fn update_network_data(
         &mut self,
         received_diff: u64,
@@ -98,17 +102,22 @@ impl NetworkManager {
         }
     }
 
-    // Erzeugt das Chart-Widget für das aktuell ausgewählte Interface.
+    // Creates a chart widget for the network traffic of the selected interface.
+    // It uses the network history to plot the download and upload data.
+    // The chart is scaled based on the maximum value found in the data.
+    // The unit is determined based on the maximum value to display it in a human-readable format.
+    // The chart is styled with colors for download (green) and upload (red).
+    // The x-axis represents time, and the y-axis represents the data rate in the appropriate unit.
     pub fn get_network_widget(&mut self) -> Chart<'_> {
         // Da selected_interface immer gesetzt ist, können wir unwrap() verwenden.
         let (download_data, upload_data) =
             self.network_history.get(&self.selected_interface).unwrap();
 
-        // Bestimme den maximalen Wert, um die Skalierung zu ermitteln.
-        // in map wird mittels des "_" Platzhalters der Wert für den Zeitstempel
-        // ignoriert, da der Zeitstempel nicht relevant ist für den Maximalwert.
-        // Weiterhin wird dann der Körper des Closure, value.abs() aufgerufen, da wir immer einen absoluten Wert brauchen
-        // aufgrund der negativen Upload-Werte.
+        // Determine the maximum value to scale the chart.
+        // The max value is determined by iterating over both download and upload data.
+        // The "_" placeholder is used to ignore the timestamp, as it is not relevant for the maximum value.
+        // The body of the closure is called with value.abs() to ensure we always
+        // have a positive value, as upload values are stored as negative.
         let max_value = download_data
             .iter()
             .chain(upload_data.iter())
@@ -116,7 +125,8 @@ impl NetworkManager {
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(0.0);
 
-        // unit ist ein &'static str, da die Werte String-Literale sind und die Lifetime ist static, da die Werte so lange wie das Programm an sich lebt die Werte anzeigen soll.
+        // unit is a &'static str, as the values are string literals and the lifetime is static,
+        // meaning the values should be displayed as long as the program itself runs.
         let (unit, scale_factor) = if max_value > 1024.0 * 1024.0 * 1024.0 {
             ("GB/s", 1024.0 * 1024.0 * 1024.0)
         } else if max_value > 1024.0 * 1024.0 {
@@ -127,7 +137,9 @@ impl NetworkManager {
             ("B/s", 1.0)
         };
 
-        // Aktualisiere die skalieren Datenfelder – diese Felder leben in der Instanz.
+        // Updates the scaled_download and scaled_upload fields with the scaled data.
+        // The data is scaled by dividing each value by the scale_factor.
+        // This ensures that the chart displays the data in a human-readable format.
         self.scaled_download = download_data
             .iter()
             .map(|(x, y)| (*x, y / scale_factor))
@@ -185,7 +197,10 @@ impl NetworkManager {
             .y_axis(y_axis)
     }
 
-    // Formatiert die Netzwerkdaten als String für die Anzeige.
+    // formats the network data as a string for display.
+    // It iterates over all network interfaces and calculates the received and transmitted data.
+    // The data is formatted based on the size (B, KB, MB, GB)
+    // and appended to the result string.
     pub fn format_network(&mut self, sys: &mut System) -> String {
         sys.refresh_all();
         let mut data_transfer = String::new();
@@ -210,10 +225,14 @@ impl NetworkManager {
             self.previous_transmitted
                 .insert(interface_name.to_string(), transmitted);
 
-            // Speichern von Updates inklusive Interface-Namen, um sie später zu aktualisieren.
+            // saved to network_updates for later processing
+            // This is done to avoid multiple println! calls in the loop,
+            // which can be inefficient and clutter the output.
+            // Instead, we collect the updates and process them after the loop.
+            // This also allows us to format the output string in a more controlled manner.
             network_updates.push((interface_name.to_string(), received_diff, transmitted_diff));
 
-            // Erzeuge den anzuzeigenden String für das Interface.
+            // Creates the formatted string for the current interface
             let network_info = if received_diff < 1000 && transmitted_diff < 1000 {
                 format!(
                     "{interface_name}: {received_diff} B/s (down), {transmitted_diff} B/s (up)\n"
@@ -234,7 +253,10 @@ impl NetworkManager {
             data_transfer.push_str(&network_info);
         }
 
-        // Aktualisiere die Historie für jedes Interface
+        // Update the network history for each interface
+        // This is done after collecting all updates to avoid modifying the history while iterating.
+        // This ensures that the history is updated only once per interface,
+        // which is more efficient and avoids potential issues with concurrent modifications.
         for (interface, received_diff, transmitted_diff) in network_updates {
             self.update_network_data(received_diff, transmitted_diff, &interface);
         }

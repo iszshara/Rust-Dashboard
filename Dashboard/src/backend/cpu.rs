@@ -40,9 +40,16 @@ pub fn format_total_cpu_usage(sys: &impl SystemInfo) -> String {
     total_cpu_usage
 }
 
-/// nimmt nur den ersten CPU
-/// holt danach den Namen des ersten CPUs
-/// + Fallback, falls keine CPUs vorhanden sind
+/// Returns the CPU name of the system
+////// #Example
+////// ```
+/// use linux_dashboard::backend::cpu::format_cpu_name;
+/// use sysinfo::System;
+/// let sys = System::new_all();
+/// let output = format_cpu_name(&sys);
+/// assert!(output.contains("CPU Name"));
+/// ```
+///
 pub fn format_cpu_name(sys: &impl SystemInfo) -> String {
     sys.get_cpus()
         .first()

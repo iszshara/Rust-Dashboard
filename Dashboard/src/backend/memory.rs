@@ -9,6 +9,15 @@ use ratatui::widgets::{Row, Table};
 use sysinfo::System;
 
 /// Returns total / used memory and swap / used swap information in a table format
+/// # Example
+/// ```
+/// use linux_dashboard::backend::memory::ram_info_table;
+/// use sysinfo::System;
+/// let sys = System::new_all();
+/// let output = ram_info_table(&sys);
+/// assert!(output.contains("Total Memory"));
+/// ```
+///
 pub fn ram_info_table(sys: &System) -> Table<'static> {
     let rows = vec![
         Row::new(vec![

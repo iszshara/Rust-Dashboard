@@ -40,8 +40,15 @@ fn truncate_string(s: &str, max_length: usize) -> String {
         format!("{}...", &s[..max_length - 3])
     }
 }
+
 /// This function creates a vector of rows representing the processes in the system.
 /// It sorts the processes based on the specified `SortOrder` and formats them into rows for display.
+/// # Arguments
+/// * `sys` - A reference to the `System` instance containing process information.
+/// * `sort_order` - The `SortOrder` enum that specifies how to sort the processes.
+/// # Returns
+/// A vector of `Row` instances, each representing a process with its PID, name, status, CPU usage, and memory usage.
+/// The rows are styled with a default style and the header row is styled with a yellow foreground color.
 pub fn create_process_rows(sys: &System, sort_order: SortOrder) -> Vec<Row<'static>> {
     let mut processes: Vec<(&Pid, &Process)> = sys.processes().iter().collect();
     match sort_order {
@@ -92,6 +99,7 @@ pub fn create_process_rows(sys: &System, sort_order: SortOrder) -> Vec<Row<'stat
     .style(Style::default().fg(Color::Yellow));
 
     // converts the process data into rows for the table
+    // Each row contains the PID, truncated name, status, CPU usage, and memory usage.
     let mut rows = vec![header]; // adds header in the first row
     rows.extend(processes.iter().map(|(pid, process)| {
         Row::new(vec![

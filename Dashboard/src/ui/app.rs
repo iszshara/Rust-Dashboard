@@ -661,7 +661,7 @@ impl App {
                 20,
             );
 
-            let manual_description = [
+            let manual_description: [&'static str; 9] = [
                 "Press 'i' to switch network interface\n",
                 "Press 'c' to sort by CPU usage\n",
                 "Press 'm' to sort by Memory usage\n",
@@ -698,6 +698,8 @@ impl App {
     }
 }
 
+/// system_uptime() returns a formatted string representing the system's uptime.
+/// It calculates the uptime in seconds, minutes, hours, or days based on the total uptime
 fn system_uptime() -> String {
     let uptime = System::uptime();
     if uptime < 60 {
