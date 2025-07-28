@@ -3,10 +3,8 @@
 use super::converter::byte_to_gib;
 use sysinfo::Disks;
 
-/// Returns disk names, the total space of the disk and the available space of the disk formatted as a string
-///
-/// #Example
-///
+/// Returns disk names, the total space of the disk and the available space of the disk formatted as a string.
+/// # Example
 /// ```
 /// use linux_dashboard::backend::disk::format_disk_information;
 /// let output = format_disk_information();

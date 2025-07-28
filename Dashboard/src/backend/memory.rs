@@ -8,7 +8,12 @@ use ratatui::widgets::Cell;
 use ratatui::widgets::{Row, Table};
 use sysinfo::System;
 
-/// Returns total / used memory and swap / used swap information in a table format
+/// Returns:  
+/// -> Total Memory...  
+/// -> Used Memory...  
+/// -> Total Swap Memory...  
+/// -> Used Swap Memory...  
+/// information in a table format.  
 /// # Example
 /// ```
 /// use linux_dashboard::backend::memory::ram_info_table;

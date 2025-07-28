@@ -1,9 +1,7 @@
 //! This module contains a helper function
 
 /// Converter which converts Bytes to GiB
-///
-/// #Example
-///
+/// # Example
 /// ```
 /// use linux_dashboard::backend::converter::byte_to_gib;
 /// let gib = byte_to_gib(1073741824);

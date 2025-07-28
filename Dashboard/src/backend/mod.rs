@@ -1,4 +1,4 @@
-//! This file is part of the Linux Dashboard project and provides various backend functionalities
+//! This module is part of the Linux Dashboard project and provides various backend functionalities
 //! such as fetching system information, CPU usage, memory statistics, and more.
 pub mod converter;
 pub mod cpu;

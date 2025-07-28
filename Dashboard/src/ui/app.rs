@@ -1,3 +1,7 @@
+//! This module contains the main application logic for the Rust Dashboard UI.
+/// It is responsible for running the terminal UI, managing user interactions, and updating the display based on system information.  
+/// It uses the `ratatui` crate for rendering the UI and `sysinfo` for fetching system data.  
+///
 use crate::backend::host::host_info_table;
 use crate::backend::processes::{SortOrder, create_process_rows};
 use crate::backend::system_info::SystemInfo;
@@ -47,7 +51,7 @@ impl Default for App {
             process_scroll_state: ScrollbarState::default(),
             cpu_scroll: 0,
             process_scroll: 0,
-            current_fetch_interval: 1000, // Initial 1000ms
+            current_fetch_interval: 1000, // Initial 1000ms fetch interval
             minus_button_rect: Rect::default(),
             plus_button_rect: Rect::default(),
         }
@@ -66,21 +70,28 @@ struct App {
     pub plus_button_rect: Rect,
 }
 
-/// run_ui() is the entry point for the terminal UI.
-/// It initializes the necessary components and starts the main loop,
-/// which renders and updates the terminal UI.
+/// run_ui() is the entry point for the terminal UI.  
+/// It initializes the necessary components and starts the main loop,  
+/// which renders and updates the terminal UI.  
 ///
-/// color_eyre is called to configure error reporting.
+/// color_eyre is called to configure error reporting.  
 ///
-/// ratatui::init() is used to prepare the terminal for display.
+/// ratatui::init() is used to prepare the terminal for display.  
 ///
 /// let mut sys = System::new_all();
 /// sys.refresh_all();
 /// creates a new System object that collects data about the system.
 ///
 /// let result = run(...) starts the main loop.
-/// It renders the UI and updates the system information at regular intervals.
-/// It takes the terminal and system information as parameters.
+/// It renders the UI and updates the system information at regular intervals.  
+/// It takes the terminal and system information as parameters.  
+/// # Example
+/// ```
+/// use linux_dashboard::ui::app::run_ui;
+/// use color_eyre::Result;
+/// let result = run_ui();
+/// assert!(result.is_ok());
+/// ```
 ///
 pub fn run_ui() -> Result<()> {
     color_eyre::install()?;
@@ -95,10 +106,10 @@ pub fn run_ui() -> Result<()> {
     app_result
 }
 
-/// Runtime function to render the Terminal and to refresh it.
-/// It sets an initial and final tick rate.
-/// The user interface is then re-rendered in a loop at the respective interval with information such as CPU usage.
-/// This is interrupted if there is a "KeyEvent" within a 50 ms time span, where 'q' is defined to exit the loop.
+/// Runtime function to render the Terminal and to refresh it.  
+/// It sets an initial and final tick rate.  
+/// The user interface is then re-rendered in a loop at the respective interval with information such as CPU usage.  
+/// This is interrupted if there is a "KeyEvent" within a 50 ms time span, where 'q' is defined to exit the loop.  
 impl App {
     pub fn run(mut self, mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
         // Disable mouse capture to prevent performance issues with mouse wheel

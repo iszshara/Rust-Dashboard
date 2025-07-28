@@ -1,7 +1,11 @@
 //! This module defines the layout for the terminal UI of the Dashboard.
-/// The function 'terminal_layout', divides the terminal area into several sections called chunks.
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-
+/// This function is responsible for creating the layout of the terminal UI.  
+/// It divides the terminal into a top section for the Gauge Bar and a bottom section that is  
+/// further divided into left and right parts.  
+/// The left part contains sections for CPU, Network, and Network Diagram,  
+/// while the right part contains sections for Memory, Processes, and System Info.  
+/// It returns a vector of Rects representing the layout of the terminal.
 pub fn terminal_layout(area: Rect) -> Vec<Rect> {
     // Main Layout for the terminal
     // It divides the terminal into two main parts:

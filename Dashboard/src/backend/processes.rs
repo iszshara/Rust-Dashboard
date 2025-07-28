@@ -1,3 +1,7 @@
+//! This module provides a table of processes with relevant information.  
+//! This module fetches and formats process information from the system,  
+//! including PID, name, status, CPU usage, and memory usage.  
+//! It allows sorting of processes based on various criteria such as CPU usage, memory usage, PID, and name.  
 use crate::backend::converter::byte_to_gib;
 use ratatui::{
     style::{Color, Style},
@@ -5,12 +9,13 @@ use ratatui::{
 };
 use sysinfo::{Pid, Process, System};
 
-/// Enum für die Sortierreihenfolge der Prozesse
-/// Diese Enum definiert verschiedene Sortierkriterien für die Prozessliste,
-/// wie CPU-Auslastung, Speicherverbrauch, PID und Name.
-/// Jede Variante repräsentiert eine spezifische Sortierreihenfolge.
-/// Die Implementierung von Default ermöglicht es, eine Standard-Sortierreihenfolge zu definieren,
-/// die verwendet wird, wenn keine spezifische Sortierreihenfolge angegeben ist.
+/// Enum for the sort order of processes  
+/// This enum defines different sorting criteria for the process list,  
+/// such as CPU usage, memory consumption, PID, and name.  
+/// Each variant represents a specific sort order.  
+/// The implementation of Default allows defining a default sort order,  
+/// which is used when no specific sort order is specified.  
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum SortOrder {
     CpuDesc,
@@ -22,9 +27,10 @@ pub enum SortOrder {
     NameAsc,
     NameDesc,
 }
-/// Implementiert Default manuell für SortOrder
-/// Dies ermöglicht es, eine Standard-Sortierreihenfolge zu definieren,
-/// die verwendet wird, wenn keine spezifische Sortierreihenfolge angegeben ist.
+/// Manually implements Default for SortOrder.  
+/// This makes it possible to define a default sort order,  
+/// which is used when no specific sort order is provided.  
+///
 impl Default for SortOrder {
     fn default() -> Self {
         SortOrder::CpuDesc // Standard-Sortierung nach CPU-Auslastung absteigend

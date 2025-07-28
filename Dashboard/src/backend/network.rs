@@ -1,3 +1,6 @@
+//! This module manages network interfaces and their data usage.
+/// It provides functionality to track network traffic, display usage statistics,  
+/// and visualize the data in a chart format.  
 use ratatui::style::Color;
 use ratatui::text::Line;
 use ratatui::text::Span;
@@ -13,6 +16,12 @@ type DataPoint = (f64, f64); // Tuple for time and value
 type DataHistory = Vec<DataPoint>; // History of data points for download and upload
 type NetworkHistory = (DataHistory, DataHistory); // Tuple for download and upload history
 type NetworkHistoryMap = HashMap<String, NetworkHistory>; // Map for each interface to its download and upload history
+
+/// NetworkManager manages network interfaces and their data usage.
+/// It tracks received and transmitted data, updates network history, and provides a chart for visualization.
+/// It also allows selecting a specific network interface to display its traffic data.
+/// The struct contains fields for networks, previous data, network history, scaled data for charting,
+/// a time counter for the chart, and the currently selected interface.
 pub struct NetworkManager {
     networks: Networks,
 
@@ -58,27 +67,27 @@ impl Default for NetworkManager {
 }
 
 impl NetworkManager {
-    // This setter-method is used to change the currently selected interface
-    // and update the history for this interface.
+    /// This setter-method is used to change the currently selected interface
+    /// and update the history for this interface.
     pub fn set_selected_interface(&mut self, interface: String) {
         self.selected_interface = interface;
     }
 
-    // This getter-method returns the keys of the network history map,
+    /// This getter-method returns the keys of the network history map,
     pub fn network_history_keys(&self) -> Vec<String> {
         self.network_history.keys().cloned().collect()
     }
 
-    // This getter-method returns the currently selected interface.
+    /// This getter-method returns the currently selected interface.
     pub fn get_selected_interface(&self) -> &String {
         &self.selected_interface
     }
 
-    // The update_network_data method updates the network history for the currently selected interface.
-    // It takes the received and transmitted data differences and updates the history.
-    // The time_counter is incremented to keep track of the time for the chart.
-    // It also ensures that the history does not exceed 50 data points.
-    // This method is called whenever new network data is available.
+    /// The update_network_data method updates the network history for the currently selected interface.  
+    /// It takes the received and transmitted data differences and updates the history.  
+    /// The time_counter is incremented to keep track of the time for the chart.  
+    /// It also ensures that the history does not exceed 50 data points.  
+    /// This method is called whenever new network data is available.  
     pub fn update_network_data(
         &mut self,
         received_diff: u64,
