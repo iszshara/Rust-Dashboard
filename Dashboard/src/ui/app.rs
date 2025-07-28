@@ -81,7 +81,7 @@ struct App {
 /// let result = run(...) starts the main loop.
 /// It renders the UI and updates the system information at regular intervals.
 /// It takes the terminal and system information as parameters.
-
+///
 pub fn run_ui() -> Result<()> {
     color_eyre::install()?;
     let terminal = ratatui::init();
@@ -109,7 +109,7 @@ impl App {
 
         let mut last_tick = Instant::now();
         let mut show_popup = true;
-        let mut network_manager = NetworkManager::new();
+        let mut network_manager = NetworkManager::default();
         let mut sort_order = SortOrder::default();
         let mut show_manual = false;
 
@@ -297,7 +297,7 @@ impl App {
                         Line::from(vec![
                             Span::raw("Required: "),
                             Span::styled(
-                                format!("{}x{}", MIN_WIDTH, MIN_HEIGHT),
+                                format!("{MIN_WIDTH}x{MIN_HEIGHT}"),
                                 Style::default().fg(Color::Yellow),
                             ),
                         ]),
@@ -363,7 +363,7 @@ impl App {
             )
             .title_bottom(
                 Line::from(vec![Span::styled(
-                    format!("{}", system_uptime()),
+                    system_uptime().to_string(),
                     Style::default(),
                 )])
                 .right_aligned(),
@@ -432,9 +432,7 @@ impl App {
 
         // CPU Usage
         let cpu_core_usage = format_cpu_usage(sys);
-        self.cpu_scroll_state = self
-            .cpu_scroll_state
-            .content_length(sys.get_cpus().len() as usize);
+        self.cpu_scroll_state = self.cpu_scroll_state.content_length(sys.get_cpus().len());
 
         let cpu_block = Block::default()
             .title("CPU Core Usage ")
@@ -663,7 +661,7 @@ impl App {
                 20,
             );
 
-            let manual_description = vec![
+            let manual_description = [
                 "Press 'i' to switch network interface\n",
                 "Press 'c' to sort by CPU usage\n",
                 "Press 'm' to sort by Memory usage\n",
@@ -703,15 +701,15 @@ impl App {
 fn system_uptime() -> String {
     let uptime = System::uptime();
     if uptime < 60 {
-        return format!("Uptime: {} seconds ", uptime);
+        format!("Uptime: {uptime} seconds ")
     } else if uptime < 3600 {
         let minutes = uptime / 60;
-        return format!("Uptime: {} minutes ", minutes);
+        format!("Uptime: {minutes} minutes ")
     } else if uptime < 86400 {
         let hours = uptime / 3600;
-        return format!("Uptime: {} hours ", hours);
+        format!("Uptime: {hours} hours ")
     } else {
         let days = uptime / 86400;
-        return format!("Uptime: {} days ", days);
+        format!("Uptime: {days} days ")
     }
 }

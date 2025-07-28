@@ -13,7 +13,7 @@ use crate::backend::system_info::SystemInfo;
 /// let output = format_cpu_usage(&sys);
 /// assert!(output.contains("CPU"));
 /// ```
-
+///
 pub fn format_cpu_usage(sys: &impl SystemInfo) -> String {
     sys.get_cpus()
         .iter()
@@ -33,7 +33,7 @@ pub fn format_cpu_usage(sys: &impl SystemInfo) -> String {
 /// let output = format_total_cpu_usage(&sys);
 /// assert!(output.contains("Total Usage"));
 /// ```
-
+///
 /// This function returns the total CPU usage of the system as a formatted string
 pub fn format_total_cpu_usage(sys: &impl SystemInfo) -> String {
     let total_cpu_usage = format!("Total Usage: {:.2}% ", sys.global_cpu_usage());
@@ -44,10 +44,8 @@ pub fn format_total_cpu_usage(sys: &impl SystemInfo) -> String {
 /// holt danach den Namen des ersten CPUs
 /// + Fallback, falls keine CPUs vorhanden sind
 pub fn format_cpu_name(sys: &impl SystemInfo) -> String {
-    let cpu_name = sys
-        .get_cpus()
-        .get(0)
+    sys.get_cpus()
+        .first()
         .map(|cpu| cpu.brand.clone())
-        .unwrap_or_else(|| "Unknown CPU".to_string());
-    cpu_name
+        .unwrap_or_else(|| "Unknown CPU".to_string())
 }

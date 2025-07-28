@@ -8,7 +8,7 @@ use ratatui::widgets::{Cell, Row, Table};
 /// Returns the system name of the Linux Distribution,
 /// kernel version of the Linux Distribution, the OS Version the Linux is currently on and
 /// the hostname of the system formatted as a string
-
+///
 pub fn host_info_table() -> Table<'static> {
     // let mut sys = System::new_all();
     // sys.refresh_all();

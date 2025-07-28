@@ -9,13 +9,16 @@ use ratatui::{
 use std::collections::HashMap;
 use sysinfo::{Networks, System};
 
+type DataPoint = (f64, f64); // Tuple for time and value
+type DataHistory = Vec<DataPoint>; // History of data points for download and upload
+type NetworkHistory = (DataHistory, DataHistory); // Tuple for download and upload history
+type NetworkHistoryMap = HashMap<String, NetworkHistory>; // Map for each interface to its download and upload history
 pub struct NetworkManager {
     networks: Networks,
 
     previous_received: HashMap<String, u64>,
     previous_transmitted: HashMap<String, u64>,
-    // For every Interface Tupel: (Download-History, Upload-History)
-    network_history: HashMap<String, (Vec<(f64, f64)>, Vec<(f64, f64)>)>,
+    network_history: NetworkHistoryMap,
     // Vec<()> because the data changes over time
     // f64 for time and the value for upload/download
     scaled_download: Vec<(f64, f64)>,
@@ -24,8 +27,8 @@ pub struct NetworkManager {
     selected_interface: String,
 }
 
-impl NetworkManager {
-    pub fn new() -> Self {
+impl Default for NetworkManager {
+    fn default() -> Self {
         let networks = Networks::new_with_refreshed_list();
         let mut network_history = HashMap::new();
 
@@ -52,6 +55,9 @@ impl NetworkManager {
             selected_interface,
         }
     }
+}
+
+impl NetworkManager {
     // dient zur Änderung der aktuell ausgewählten Schnittstelle
     // und aktualisiert die Historie für diese Schnittstelle.
     pub fn set_selected_interface(&mut self, interface: String) {
@@ -210,30 +216,20 @@ impl NetworkManager {
             // Erzeuge den anzuzeigenden String für das Interface.
             let network_info = if received_diff < 1000 && transmitted_diff < 1000 {
                 format!(
-                    "{}: {} B/s (down), {} B/s (up)\n",
-                    interface_name, received_diff, transmitted_diff
+                    "{interface_name}: {received_diff} B/s (down), {transmitted_diff} B/s (up)\n"
                 )
             } else if received_diff < 1000 * 1000 && transmitted_diff < 1000 * 1000 {
                 let down_kb = received_diff / 1000;
                 let up_kb = transmitted_diff / 1000;
-                format!(
-                    "{}: {} KB/s (down), {} KB/s (up)\n",
-                    interface_name, down_kb, up_kb
-                )
+                format!("{interface_name}: {down_kb} KB/s (down), {up_kb} KB/s (up)\n")
             } else if received_diff < 1000 * 1000 * 1000 && transmitted_diff < 1000 * 1000 * 1000 {
                 let down_mb = received_diff / (1000 * 1000);
                 let up_mb = transmitted_diff / (1000 * 1000);
-                format!(
-                    "{}: {} MB/s (down), {} MB/s (up)\n",
-                    interface_name, down_mb, up_mb
-                )
+                format!("{interface_name}: {down_mb} MB/s (down), {up_mb} MB/s (up)\n")
             } else {
                 let down_gb = received_diff / (1000 * 1000 * 1000);
                 let up_gb = transmitted_diff / (1000 * 1000 * 1000);
-                format!(
-                    "{}: {} GB/s (down), {} GB/s (up)\n",
-                    interface_name, down_gb, up_gb
-                )
+                format!("{interface_name}: {down_gb} GB/s (down), {up_gb} GB/s (up)\n")
             };
             data_transfer.push_str(&network_info);
         }
