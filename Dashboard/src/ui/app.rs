@@ -93,16 +93,18 @@ struct App {
 /// assert!(result.is_ok());
 /// ```
 ///
-pub fn run_ui() -> Result<()> {
+pub fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
     color_eyre::install()?;
-    let terminal = ratatui::init();
+    crossterm::execute!(
+        terminal.backend_mut(),
+        crossterm::event::DisableMouseCapture,
+    )?;
 
     let mut sys = System::new_all();
     sys.refresh_all();
 
     let app = App::default();
     let app_result = app.run(terminal, &mut sys);
-    ratatui::restore();
     app_result
 }
 
@@ -113,10 +115,10 @@ pub fn run_ui() -> Result<()> {
 impl App {
     pub fn run(mut self, mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
         // Disable mouse capture to prevent performance issues with mouse wheel
-        crossterm::execute!(
-            terminal.backend_mut(),
-            crossterm::event::DisableMouseCapture
-        )?;
+        // crossterm::execute!(
+        //     terminal.backend_mut(),
+        //     crossterm::event::DisableMouseCapture,
+        // )?;
 
         let mut last_tick = Instant::now();
         let mut show_popup = true;
@@ -137,29 +139,7 @@ impl App {
                         code: KeyCode::Char('q'),
                         ..
                     }) => break Ok(()),
-                    Event::Mouse(event::MouseEvent {
-                        kind: event::MouseEventKind::Up(..), // Use .. to ignore the MouseButton value
-                        column,
-                        row,
-                        ..
-                    }) => {
-                        let click_point = Rect::new(column, row, 1, 1);
-                        if click_point.intersects(self.minus_button_rect) {
-                            self.current_fetch_interval =
-                                self.current_fetch_interval.saturating_sub(100).max(100);
-                        } else if click_point.intersects(self.plus_button_rect) {
-                            self.current_fetch_interval =
-                                self.current_fetch_interval.saturating_add(100).min(60000);
-                        }
-                    }
-                    Event::Mouse(event::MouseEvent {
-                        kind: event::MouseEventKind::ScrollDown,
-                        ..
-                    }) => {}
-                    Event::Mouse(event::MouseEvent {
-                        kind: event::MouseEventKind::ScrollUp,
-                        ..
-                    }) => {}
+                    Event::Mouse(_) => {} // Ignore all mouse events
                     Event::Key(KeyEvent {
                         code: KeyCode::Enter,
                         ..
@@ -345,7 +325,7 @@ impl App {
         }
     }
 
-    /// render() draws the frame of the TUI app and creates various objects such as paragraphs, blocks, etc.
+    // render() draws the frame of the TUI app and creates various objects such as paragraphs, blocks, etc.
     fn render(
         &mut self,
         frame: &mut Frame,
@@ -442,7 +422,6 @@ impl App {
         let chunks = layout::terminal_layout(inner_area);
 
         // CPU Usage
-        let cpu_core_usage = format_cpu_usage(sys);
         self.cpu_scroll_state = self.cpu_scroll_state.content_length(sys.get_cpus().len());
 
         let cpu_block = Block::default()
@@ -453,7 +432,7 @@ impl App {
             } else {
                 Style::default()
             });
-        let cpu_widget = Paragraph::new(cpu_core_usage)
+        let cpu_widget = Paragraph::new(format_cpu_usage(sys))
             .block(cpu_block)
             .wrap(Wrap { trim: true })
             .scroll((self.cpu_scroll as u16, 0));
@@ -472,8 +451,6 @@ impl App {
         );
 
         // CPU Gauge
-        let cpu_usage = sys.global_cpu_usage();
-
         let cpu_gauge = Gauge::default()
             .block(
                 Block::default()
@@ -481,7 +458,7 @@ impl App {
                     .borders(Borders::ALL),
             )
             .gauge_style(Style::default().fg(Color::LightBlue).bg(Color::Gray))
-            .percent(cpu_usage as u16);
+            .percent(sys.global_cpu_usage() as u16);
         frame.render_widget(cpu_gauge, chunks[0]);
 
         // Memory Block
@@ -493,8 +470,7 @@ impl App {
 
         // Network Block
         let network_block = Block::default().title("Network").borders(Borders::ALL);
-        let network_info = network_manager.format_network(sys);
-        let network_widget = Paragraph::new(network_info)
+        let network_widget = Paragraph::new(network_manager.format_network(sys))
             .block(network_block)
             .wrap(Wrap { trim: true });
         frame.render_widget(network_widget.clone(), chunks[2]);

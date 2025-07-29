@@ -36,9 +36,9 @@ impl Default for SortOrder {
         SortOrder::CpuDesc // Standard-Sortierung nach CPU-Auslastung absteigend
     }
 }
-/// s is short for string slice (the result is better performance bc, the Compiler is told to not look at the whole string, but only the relevant part).
-/// It then gets converted into a String to return a new owned String.
-/// Short: Truncates a string to a maximum length and appends "..." if it exceeds that length.
+// s is short for string slice (the result is better performance bc, the Compiler is told to not look at the whole string, but only the relevant part).
+// It then gets converted into a String to return a new owned String.
+// Short: Truncates a string to a maximum length and appends "..." if it exceeds that length.
 fn truncate_string(s: &str, max_length: usize) -> String {
     if s.len() <= max_length {
         s.to_string()
