@@ -83,11 +83,11 @@ impl NetworkManager {
         &self.selected_interface
     }
 
-    /// The update_network_data method updates the network history for the currently selected interface.  
-    /// It takes the received and transmitted data differences and updates the history.  
-    /// The time_counter is incremented to keep track of the time for the chart.  
-    /// It also ensures that the history does not exceed 50 data points.  
-    /// This method is called whenever new network data is available.  
+    // The update_network_data method updates the network history for the currently selected interface.  
+    // It takes the received and transmitted data differences and updates the history.  
+    // The time_counter is incremented to keep track of the time for the chart.  
+    // It also ensures that the history does not exceed 50 data points.  
+    // This method is called whenever new network data is available.  
     pub fn update_network_data(
         &mut self,
         received_diff: u64,
