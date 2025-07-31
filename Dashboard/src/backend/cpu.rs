@@ -2,8 +2,8 @@
 
 use crate::backend::system_info::SystemInfo;
 
-/// Returns the full CPU-utilization of all cores formatted as string
-/// Shows CPU Core usage.
+/// Returns the full CPU-utilization of all cores formatted as string.  
+/// Shows CPU Core usage.  
 ///
 /// # Example
 /// ```

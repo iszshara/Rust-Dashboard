@@ -50,6 +50,7 @@ pub fn ram_info_table(sys: &System) -> Table<'static> {
         Constraint::Length(5),
         Constraint::Length(6),
         Constraint::Length(10),
+        Constraint::Length(10),
     ];
     Table::new(rows, widths)
         .column_spacing(1)
