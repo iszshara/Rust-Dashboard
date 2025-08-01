@@ -367,6 +367,13 @@ impl App {
             .title_alignment(Alignment::Left)
             .title_bottom(
                 Line::from(vec![Span::styled(
+                    format!("Press 'Esc' for options"),
+                    Style::default(),
+                )])
+                .left_aligned(),
+            )
+            .title_bottom(
+                Line::from(vec![Span::styled(
                     format!("User: {}", get_current_user()),
                     Style::default(),
                 )])
