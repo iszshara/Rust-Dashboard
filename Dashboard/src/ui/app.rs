@@ -16,6 +16,7 @@ use crate::{
 };
 use chrono::Local;
 use color_eyre::Result;
+use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::layout::Constraint;
 use ratatui::style::Color;
 use ratatui::text::{Line, Span};
@@ -31,6 +32,7 @@ use ratatui::{
     prelude::*,
     style::Style,
 };
+use std::io;
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
@@ -96,15 +98,20 @@ struct App {
 pub fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
     color_eyre::install()?;
     crossterm::execute!(
-        terminal.backend_mut(),
-        crossterm::event::DisableMouseCapture,
+        io::stdout(),
+        EnterAlternateScreen,
+        crossterm::event::DisableMouseCapture
     )?;
+    terminal.clear()?;
 
     let mut sys = System::new_all();
     sys.refresh_all();
 
-    let app = App::default();
-    let app_result = app.run(terminal, &mut sys);
+    let mut app = App::default();
+    let app_result = app.run(&mut terminal, &mut sys);
+
+    crossterm::execute!(io::stdout(), LeaveAlternateScreen)?;
+
     app_result
 }
 
@@ -113,7 +120,7 @@ pub fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
 /// The user interface is then re-rendered in a loop at the respective interval with information such as CPU usage.  
 /// This is interrupted if there is a "KeyEvent" within a 50 ms time span, where 'q' is defined to exit the loop.  
 impl App {
-    pub fn run(mut self, mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
+    pub fn run(&mut self, terminal: &mut DefaultTerminal, sys: &mut System) -> Result<()> {
         // Disable mouse capture to prevent performance issues with mouse wheel
         // crossterm::execute!(
         //     terminal.backend_mut(),
@@ -311,8 +318,7 @@ impl App {
                     frame.render_widget(Clear, size);
                     frame.render_widget(paragraph, size);
                 } else {
-                    Self::render(
-                        &mut self,
+                    self.render(
                         frame,
                         sys,
                         &mut show_popup,
