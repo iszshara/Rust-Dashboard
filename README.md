@@ -72,10 +72,11 @@ chmod +x linux_dashboard
 
 ## Documentation
 
-When cloning the github you can open the project in your editor and type in:
+When cloning the github you can open the project in your Terminal and type:
 ```bash
 cargo doc --open
 ```
+This will open your Standard Browser with the code documentation.
 
 ## Credits
 
