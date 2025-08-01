@@ -45,6 +45,18 @@ enum ActiveBlock {
     Processes,
 }
 
+#[allow(dead_code)] // used to get rid of annoying warnings
+struct App {
+    active_block: ActiveBlock,
+    cpu_scroll_state: ScrollbarState,
+    process_scroll_state: ScrollbarState,
+    cpu_scroll: usize,
+    process_scroll: usize,
+    pub current_fetch_interval: u64,
+    pub minus_button_rect: Rect,
+    pub plus_button_rect: Rect,
+}
+
 impl Default for App {
     fn default() -> Self {
         Self {
@@ -58,18 +70,6 @@ impl Default for App {
             plus_button_rect: Rect::default(),
         }
     }
-}
-
-#[allow(dead_code)] // used to get rid of annoying warnings
-struct App {
-    active_block: ActiveBlock,
-    cpu_scroll_state: ScrollbarState,
-    process_scroll_state: ScrollbarState,
-    cpu_scroll: usize,
-    process_scroll: usize,
-    pub current_fetch_interval: u64,
-    pub minus_button_rect: Rect,
-    pub plus_button_rect: Rect,
 }
 
 /// run_ui() is the entry point for the terminal UI.  
@@ -351,6 +351,13 @@ impl App {
             // Top left: System Monitor
             .title(Span::styled("System Monitor", Style::default()))
             .title_alignment(Alignment::Left)
+            .title_bottom(
+                Line::from(vec![Span::styled(
+                    format!("Press 'Esc' for options"),
+                    Style::default(),
+                )])
+                .left_aligned(),
+            )
             .title_bottom(
                 Line::from(vec![Span::styled(
                     format!("User: {}", get_current_user()),
