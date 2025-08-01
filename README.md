@@ -1,48 +1,75 @@
-To-Do
+# Rust System Dashboard
 
-#1 add a sorter for processes block (maybe sort algorithm + the ui for it) > ✅ both Tasks completed!
+A terminal-based system monitoring dashboard written in Rust.
 
-#2 update the overall design (more color, etc.)     > ✅ Task completed!
+## About the Project
 
-#3 add a manual/help page for the usable keys when ESC is pressed + the option to quit  > ✅ Task completed!
+This project provides a real-time dashboard to monitor various system metrics, including CPU usage, memory consumption, network activity, running processes, and general system information. The user interface is built using the `ratatui` crate, providing an interactive and responsive experience in the terminal.
 
-#4 add options for color choosing       > Task canceled/delayed
+## Features
 
-#5 add option if user wants to see popup        > Task canceled/delayed
+- **CPU Monitoring:** Displays overall CPU usage as a gauge and provides a detailed view of individual core usage.
+- **Memory Monitoring:** Shows detailed information about RAM and swap usage.
+- **Network Monitoring:** Tracks network data transmission and reception, with a graphical representation of network activity.
+- **Process List:** Lists running processes with details such as PID, CPU usage, memory usage, and name. Processes can be sorted by different criteria.
+- **System Information:** Displays host information, including operating system, kernel version, and uptime.
+- **Interactive UI:** Allows switching between different views, scrolling through lists, and adjusting the data refresh interval.
 
-#6 add vertical bar chart for cpu core usage > ✅ Task completed!
+## Upcoming
 
-#7 add uptime to dashboard     > ✅ Task completed!
+- Improve fetching mechanism
+- Add kill option for processes
+- Add option to choose between a second layout (or only one box at the time)
 
-#8 add fetch intervall, where the user can choose between 100ms and 1min (60000ms) > ✅ Task completed!
+## Usage
 
-#9 add Error message if the window scaling is too small to display data correctly   > ✅ Task completed!
+To run the dashboard, you can either build it from the source or download a pre-compiled binary from the release page.
 
-#13 improve the way the fetching works(
-   1. Introduce Dependencies: add the tokio crate for asynchronous
-       runtime and its multi-threaded capabilities.
-   2. Create a Shared Data Store: define new struct to hold
-      application's state (CPU data, process lists, etc.). This store will
-      be wrapped in Arc<Mutex<...>> to allow safe, shared access between
-      the data-fetching thread and the UI thread.
-   3. Spawn a Background Fetching Task: A dedicated tokio task will be
-      created. It will loop, periodically call sys.refresh_all(), and
-      update the shared data store.
-   4. Decouple Input Handling: User input will be handled in a separate
-      task that sends events to the main UI loop through a channel,
-      preventing any input lag.
-   5. Adapt the Main UI Loop: The main loop will no longer fetch data
-      directly. Instead, it will listen for events and, on every "tick," it
-       will lock the shared data store to get the latest information for
-      rendering.)
+### Building from Source
 
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/your-username/Rust-Dashboard.git
+    ```
+2.  Navigate to the project directory:
+    ```bash
+    cd Rust-Dashboard/Dashboard
+    ```
+3.  Build and run the project:
+    ```bash
+    cargo run --release
+    ```
 
-MAYBE
+### Interaction
 
-#10 add kill option for processes
+-   **`q`**: Quit the application.
+-   **`Tab`**: Switch between the CPU and Processes panels.
+-   **`Up`/`Down` Arrows**: Scroll through the active panel.
+-   **`Left`/`Right` Arrows**: Adjust the data refresh interval.
+-   **`i`**: Switch the selected network interface.
+-   **`c`**, **`m`**, **`p`**, **`n`**: Sort the process list by CPU, Memory, PID, or Name, respectively.
+-   **`Esc`**: Show/hide the options menu.
 
-#11 maybe add some symbols (e.g. to up and download)    > ✅ Task completed!
+## Dependencies
 
-#12 maybe add scrollbar for processes block         > ✅ Task completed!
+This project relies on the following main dependencies:
 
-#13 maybe add option to choose between a second layout (or only one box at the time)
+-   `sysinfo`: To gather system information.
+-   `ratatui`: For creating the terminal user interface.
+-   `crossterm`: For terminal manipulation.
+-   `chrono`: For time-related functionalities.
+-   `color-eyre`: For better error reporting.
+
+## Download and Run
+
+You can download the application from the release page.
+
+For Linux and macOS, you need to make the file executable with the following command:
+
+```bash
+chmod +x linux_dashboard
+```
+
+## Credits
+
+Thanks to @orhundev's YouTube Channel Videos on TUI applications I learned a lot on how to use ratatui and was able to write my first Rust project, as well as my first project overall. There is still a few things to implement, but this version will cut it for the time being.
