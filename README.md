@@ -70,6 +70,13 @@ For Linux and macOS, you need to make the file executable with the following com
 chmod +x linux_dashboard
 ```
 
+## Documentation
+
+When cloning the github you can open the project in your editor and type in:
+```bash
+cargo doc --open
+```
+
 ## Credits
 
 Thanks to @orhundev's YouTube Channel Videos on TUI applications I learned a lot on how to use ratatui and was able to write my first Rust project, as well as my first project overall. There is still a few things to implement, but this version will cut it for the time being.
