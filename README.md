@@ -39,7 +39,7 @@ To-Do
 
 MAYBE
 
-#10 add kill option for processes
+#10 add kill option for processes                  > ✅ Task completed!
 
 #11 maybe add some symbols (e.g. to up and download)    > ✅ Task completed!
 
