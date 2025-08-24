@@ -7,7 +7,7 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Cell, Row},
 };
-use sysinfo::{Pid, Process, System};
+use sysinfo::{Pid, Process, Signal, System};
 
 /// Enum for the sort order of processes  
 /// This enum defines different sorting criteria for the process list,  
@@ -117,4 +117,29 @@ pub fn create_process_rows(sys: &System, sort_order: SortOrder) -> Vec<Row<'stat
         ])
     }));
     rows
+}
+
+pub fn kill_process(pid_to_kill: usize, signal: Signal) -> Option<String> {
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    if let Some(process) = sys.process(pid_to_kill.into()) {
+        let name = process.name().to_string_lossy().to_string();
+
+        let killed = match process.kill_with(signal) {
+            Some(true) => {
+                sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+                sys.process(pid_to_kill.into()).is_none()
+            }
+            _ => false,
+        };
+
+        if killed {
+            Some(format!("Killed process {} ({})", pid_to_kill, name))
+        } else {
+            Some(format!("Failed to kill process {} ({})", pid_to_kill, name))
+        }
+    } else {
+        Some(format!("No process found with PID {}", pid_to_kill))
+    }
 }
