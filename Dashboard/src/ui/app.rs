@@ -3,6 +3,7 @@
 /// It uses the `ratatui` crate for rendering the UI and `sysinfo` for fetching system data.  
 ///
 use crate::backend::host::host_info_table;
+use crate::backend::processes::kill_process;
 use crate::backend::processes::{SortOrder, create_process_rows};
 use crate::backend::system_info::SystemInfo;
 use crate::{
@@ -16,6 +17,9 @@ use crate::{
 };
 use chrono::Local;
 use color_eyre::Result;
+use crossterm::event::KeyEventKind;
+use crossterm::terminal::disable_raw_mode;
+use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen, enable_raw_mode};
 use ratatui::layout::Constraint;
 use ratatui::style::Color;
 use ratatui::text::{Line, Span};
@@ -31,8 +35,9 @@ use ratatui::{
     prelude::*,
     style::Style,
 };
+use std::io;
 use std::time::{Duration, Instant};
-use sysinfo::System;
+use sysinfo::{Signal, System};
 
 const MIN_WIDTH: u16 = 110;
 const MIN_HEIGHT: u16 = 24;
@@ -43,23 +48,15 @@ enum ActiveBlock {
     Processes,
 }
 
-impl Default for App {
-    fn default() -> Self {
-        Self {
-            active_block: ActiveBlock::Cpu,
-            cpu_scroll_state: ScrollbarState::default(),
-            process_scroll_state: ScrollbarState::default(),
-            cpu_scroll: 0,
-            process_scroll: 0,
-            current_fetch_interval: 1000, // Initial 1000ms fetch interval
-            minus_button_rect: Rect::default(),
-            plus_button_rect: Rect::default(),
-        }
-    }
+#[derive(PartialEq)]
+enum Mode {
+    Normal,
+    Input,
 }
 
-#[allow(dead_code)] // used to get rid of annoying warnings
+//#[allow(dead_code)] // used to get rid of annoying warnings
 struct App {
+    running: bool,
     active_block: ActiveBlock,
     cpu_scroll_state: ScrollbarState,
     process_scroll_state: ScrollbarState,
@@ -68,6 +65,38 @@ struct App {
     pub current_fetch_interval: u64,
     pub minus_button_rect: Rect,
     pub plus_button_rect: Rect,
+    mode: Mode,
+    input: String,
+    show_popup: bool,
+    show_manual: bool,
+    sort_order: SortOrder,
+    network_manager: NetworkManager,
+    process_status: Option<(String, Color)>,
+    kill_message: Option<(String, Instant)>,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            running: true,
+            active_block: ActiveBlock::Cpu,
+            cpu_scroll_state: ScrollbarState::default(),
+            process_scroll_state: ScrollbarState::default(),
+            cpu_scroll: 0,
+            process_scroll: 0,
+            current_fetch_interval: 1000, // Initial 1000ms fetch interval
+            minus_button_rect: Rect::default(),
+            plus_button_rect: Rect::default(),
+            mode: Mode::Normal,
+            input: String::new(),
+            show_popup: true,
+            show_manual: false,
+            sort_order: SortOrder::default(),
+            network_manager: NetworkManager::default(),
+            process_status: None,
+            kill_message: None,
+        }
+    }
 }
 
 /// run_ui() is the entry point for the terminal UI.  
@@ -93,16 +122,33 @@ struct App {
 /// assert!(result.is_ok());
 /// ```
 ///
-pub fn run_ui() -> Result<()> {
+pub fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
     color_eyre::install()?;
-    let terminal = ratatui::init();
+    enable_raw_mode()?; // Raw Mode aktivieren
+
+    let mut stdout = io::stdout();
+    crossterm::execute!(
+        stdout,
+        EnterAlternateScreen,
+        crossterm::event::EnableMouseCapture
+    )?;
+
+    terminal.clear()?;
 
     let mut sys = System::new_all();
     sys.refresh_all();
 
-    let app = App::default();
-    let app_result = app.run(terminal, &mut sys);
-    ratatui::restore();
+    let mut app = App::default();
+    let app_result = app.run(&mut terminal, &mut sys);
+
+    // Aufräumen
+    crossterm::execute!(
+        io::stdout(),
+        LeaveAlternateScreen,
+        crossterm::event::DisableMouseCapture
+    )?;
+    disable_raw_mode()?; // Raw Mode deaktivieren
+
     app_result
 }
 
@@ -111,167 +157,22 @@ pub fn run_ui() -> Result<()> {
 /// The user interface is then re-rendered in a loop at the respective interval with information such as CPU usage.  
 /// This is interrupted if there is a "KeyEvent" within a 50 ms time span, where 'q' is defined to exit the loop.  
 impl App {
-    pub fn run(mut self, mut terminal: DefaultTerminal, sys: &mut System) -> Result<()> {
-        // Disable mouse capture to prevent performance issues with mouse wheel
-        crossterm::execute!(
-            terminal.backend_mut(),
-            crossterm::event::DisableMouseCapture
-        )?;
-
+    pub fn run(&mut self, terminal: &mut DefaultTerminal, sys: &mut System) -> Result<()> {
         let mut last_tick = Instant::now();
-        let mut show_popup = true;
-        let mut network_manager = NetworkManager::default();
-        let mut sort_order = SortOrder::default();
-        let mut show_manual = false;
+
+        let tick_rate = Duration::from_millis(self.current_fetch_interval);
 
         loop {
-            let tick_rate = Duration::from_millis(self.current_fetch_interval);
+            if !self.running {
+                return Ok(());
+            }
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
 
             if crossterm::event::poll(timeout)? {
                 let evt = event::read()?;
-                match evt {
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Char('q'),
-                        ..
-                    }) => break Ok(()),
-                    Event::Mouse(event::MouseEvent {
-                        kind: event::MouseEventKind::Up(..), // Use .. to ignore the MouseButton value
-                        column,
-                        row,
-                        ..
-                    }) => {
-                        let click_point = Rect::new(column, row, 1, 1);
-                        if click_point.intersects(self.minus_button_rect) {
-                            self.current_fetch_interval =
-                                self.current_fetch_interval.saturating_sub(100).max(100);
-                        } else if click_point.intersects(self.plus_button_rect) {
-                            self.current_fetch_interval =
-                                self.current_fetch_interval.saturating_add(100).min(60000);
-                        }
-                    }
-                    Event::Mouse(event::MouseEvent {
-                        kind: event::MouseEventKind::ScrollDown,
-                        ..
-                    }) => {}
-                    Event::Mouse(event::MouseEvent {
-                        kind: event::MouseEventKind::ScrollUp,
-                        ..
-                    }) => {}
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Enter,
-                        ..
-                    }) => {
-                        show_popup = false;
-                    }
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Char('i'),
-                        ..
-                    }) => {
-                        let interfaces: Vec<_> = network_manager.network_history_keys();
-                        if !interfaces.is_empty() {
-                            let current_index = interfaces
-                                .iter()
-                                .position(|x| x == network_manager.get_selected_interface())
-                                .unwrap_or(0);
-                            let next_index = (current_index + 1) % interfaces.len();
-                            network_manager.set_selected_interface(interfaces[next_index].clone());
-                        }
-                    }
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Char('c'), // 'c' for CPU
-                        ..
-                    }) => {
-                        sort_order = match sort_order {
-                            SortOrder::CpuAsc => SortOrder::CpuDesc,
-                            _ => SortOrder::CpuAsc, // Default to ascending if not currently CPU sorted
-                        };
-                    }
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Char('m'), // 'm' for Memory
-                        ..
-                    }) => {
-                        sort_order = match sort_order {
-                            SortOrder::MemoryAsc => SortOrder::MemoryDesc,
-                            _ => SortOrder::MemoryAsc,
-                        };
-                    }
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Char('p'), // 'p' for PID
-                        ..
-                    }) => {
-                        sort_order = match sort_order {
-                            SortOrder::PidAsc => SortOrder::PidDesc,
-                            _ => SortOrder::PidAsc,
-                        };
-                    }
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Char('n'), // 's' for Name
-                        ..
-                    }) => {
-                        sort_order = match sort_order {
-                            SortOrder::NameAsc => SortOrder::NameDesc,
-                            _ => SortOrder::NameAsc,
-                        };
-                    }
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Tab, ..
-                    }) => {
-                        self.active_block = match self.active_block {
-                            ActiveBlock::Cpu => ActiveBlock::Processes,
-                            ActiveBlock::Processes => ActiveBlock::Cpu,
-                        };
-                    }
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Up, ..
-                    }) => match self.active_block {
-                        ActiveBlock::Cpu => {
-                            self.cpu_scroll = self.cpu_scroll.saturating_sub(1);
-                            self.cpu_scroll_state = self.cpu_scroll_state.position(self.cpu_scroll);
-                        }
-                        ActiveBlock::Processes => {
-                            self.process_scroll = self.process_scroll.saturating_sub(1);
-                            self.process_scroll_state =
-                                self.process_scroll_state.position(self.process_scroll);
-                        }
-                    },
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Down,
-                        ..
-                    }) => match self.active_block {
-                        ActiveBlock::Cpu => {
-                            self.cpu_scroll = self.cpu_scroll.saturating_add(1);
-                            self.cpu_scroll_state = self.cpu_scroll_state.position(self.cpu_scroll);
-                        }
-                        ActiveBlock::Processes => {
-                            self.process_scroll = self.process_scroll.saturating_add(1);
-                            self.process_scroll_state =
-                                self.process_scroll_state.position(self.process_scroll);
-                        }
-                    },
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Left,
-                        ..
-                    }) => {
-                        self.current_fetch_interval =
-                            self.current_fetch_interval.saturating_sub(100).max(100);
-                    }
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Right,
-                        ..
-                    }) => {
-                        self.current_fetch_interval =
-                            self.current_fetch_interval.saturating_add(100).min(60000);
-                    }
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Esc, ..
-                    }) => {
-                        show_manual = !show_manual;
-                    }
-                    _ => {}
-                }
+                self.handle_event(evt)?;
             }
 
             if last_tick.elapsed() >= tick_rate {
@@ -331,30 +232,142 @@ impl App {
                     frame.render_widget(Clear, size);
                     frame.render_widget(paragraph, size);
                 } else {
-                    Self::render(
-                        &mut self,
-                        frame,
-                        sys,
-                        &mut show_popup,
-                        &mut network_manager,
-                        &mut sort_order,
-                        &mut show_manual,
-                    )
+                    self.render(frame, sys)
                 }
             })?;
         }
     }
 
-    /// render() draws the frame of the TUI app and creates various objects such as paragraphs, blocks, etc.
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        sys: &mut System,
-        show_popup: &mut bool,
-        network_manager: &mut NetworkManager,
-        sort_order: &mut SortOrder,
-        show_manual: &mut bool,
-    ) {
+    pub fn handle_event(&mut self, evt: Event) -> Result<()> {
+        if let Event::Key(KeyEvent { code, kind, .. }) = evt {
+            if kind != KeyEventKind::Press {
+                return Ok(()); // Nur Press-Events behandeln
+            }
+
+            match code {
+                // Normal Mode
+                KeyCode::Char('q') => self.running = false,
+                KeyCode::Enter => {
+                    if self.show_popup {
+                        self.show_popup = false; // Start-Popup schließen
+                    }
+                }
+                KeyCode::Esc => {
+                    if !self.show_popup {
+                        self.show_manual = !self.show_manual; // Manual toggle nur wenn Popup weg ist
+                    }
+                }
+                KeyCode::Char('i') => {
+                    let interfaces: Vec<_> = self.network_manager.network_history_keys();
+                    if !interfaces.is_empty() {
+                        let current_index = interfaces
+                            .iter()
+                            .position(|x| x == self.network_manager.get_selected_interface())
+                            .unwrap_or(0);
+                        let next_index = (current_index + 1) % interfaces.len();
+                        self.network_manager
+                            .set_selected_interface(interfaces[next_index].clone());
+                    }
+                }
+                KeyCode::Char('c') => {
+                    self.sort_order = match self.sort_order {
+                        SortOrder::CpuAsc => SortOrder::CpuDesc,
+                        _ => SortOrder::CpuAsc,
+                    }
+                }
+                KeyCode::Char('m') => {
+                    self.sort_order = match self.sort_order {
+                        SortOrder::MemoryAsc => SortOrder::MemoryDesc,
+                        _ => SortOrder::MemoryAsc,
+                    }
+                }
+                KeyCode::Char('p') => {
+                    self.sort_order = match self.sort_order {
+                        SortOrder::PidAsc => SortOrder::PidDesc,
+                        _ => SortOrder::PidAsc,
+                    }
+                }
+                KeyCode::Char('n') => {
+                    self.sort_order = match self.sort_order {
+                        SortOrder::NameAsc => SortOrder::NameDesc,
+                        _ => SortOrder::NameAsc,
+                    }
+                }
+                KeyCode::Tab => {
+                    self.active_block = match self.active_block {
+                        ActiveBlock::Cpu => ActiveBlock::Processes,
+                        ActiveBlock::Processes => ActiveBlock::Cpu,
+                    };
+                }
+                KeyCode::Up => match self.active_block {
+                    ActiveBlock::Cpu => {
+                        self.cpu_scroll = self.cpu_scroll.saturating_sub(1);
+                        self.cpu_scroll_state = self.cpu_scroll_state.position(self.cpu_scroll);
+                    }
+                    ActiveBlock::Processes => {
+                        self.process_scroll = self.process_scroll.saturating_sub(1);
+                        self.process_scroll_state =
+                            self.process_scroll_state.position(self.process_scroll);
+                    }
+                },
+                KeyCode::Down => match self.active_block {
+                    ActiveBlock::Cpu => {
+                        self.cpu_scroll = self.cpu_scroll.saturating_add(1);
+                        self.cpu_scroll_state = self.cpu_scroll_state.position(self.cpu_scroll);
+                    }
+                    ActiveBlock::Processes => {
+                        self.process_scroll = self.process_scroll.saturating_add(1);
+                        self.process_scroll_state =
+                            self.process_scroll_state.position(self.process_scroll);
+                    }
+                },
+                KeyCode::Left => {
+                    self.current_fetch_interval =
+                        self.current_fetch_interval.saturating_sub(100).max(100);
+                }
+                KeyCode::Right => {
+                    self.current_fetch_interval =
+                        self.current_fetch_interval.saturating_add(100).min(60000);
+                }
+
+                // Start Input Mode
+                KeyCode::Char('M') => {
+                    if self.mode == Mode::Normal {
+                        self.mode = Mode::Input;
+                        self.input.clear();
+                    } else {
+                        self.mode = Mode::Normal;
+                    }
+                }
+                _ => {}
+            }
+
+            // Input Mode
+            if self.mode == Mode::Input {
+                match code {
+                    KeyCode::Char(c) if c.is_ascii_digit() => self.input.push(c),
+                    KeyCode::Backspace => {
+                        self.input.pop();
+                    }
+                    KeyCode::Enter => {
+                        if let Ok(pid) = self.input.parse::<usize>() {
+                            if let Some(msg) = kill_process(pid, Signal::Kill) {
+                                self.kill_message = Some((msg, Instant::now())); // Nachricht + Timestamp
+                            }
+                        }
+                        self.mode = Mode::Normal;
+                    }
+                    KeyCode::Esc => self.mode = Mode::Normal,
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    // render() draws the frame of the TUI app and creates various objects such as paragraphs, blocks, etc.
+    fn render(&mut self, frame: &mut Frame, sys: &mut System) {
         // Get the entire terminal area
         let area = frame.area();
 
@@ -449,7 +462,6 @@ impl App {
         let chunks = layout::terminal_layout(inner_area);
 
         // CPU Usage
-        let cpu_core_usage = format_cpu_usage(sys);
         self.cpu_scroll_state = self.cpu_scroll_state.content_length(sys.get_cpus().len());
 
         let cpu_block = Block::default()
@@ -460,7 +472,7 @@ impl App {
             } else {
                 Style::default()
             });
-        let cpu_widget = Paragraph::new(cpu_core_usage)
+        let cpu_widget = Paragraph::new(format_cpu_usage(sys))
             .block(cpu_block)
             .wrap(Wrap { trim: true })
             .scroll((self.cpu_scroll as u16, 0));
@@ -479,8 +491,6 @@ impl App {
         );
 
         // CPU Gauge
-        let cpu_usage = sys.global_cpu_usage();
-
         let cpu_gauge = Gauge::default()
             .block(
                 Block::default()
@@ -488,7 +498,7 @@ impl App {
                     .borders(Borders::ALL),
             )
             .gauge_style(Style::default().fg(Color::LightBlue).bg(Color::Gray))
-            .percent(cpu_usage as u16);
+            .percent(sys.global_cpu_usage() as u16);
         frame.render_widget(cpu_gauge, chunks[0]);
 
         // Memory Block
@@ -500,19 +510,46 @@ impl App {
 
         // Network Block
         let network_block = Block::default().title("Network").borders(Borders::ALL);
-        let network_info = network_manager.format_network(sys);
-        let network_widget = Paragraph::new(network_info)
+        let network_widget = Paragraph::new(self.network_manager.format_network(sys))
             .block(network_block)
             .wrap(Wrap { trim: true });
         frame.render_widget(network_widget.clone(), chunks[2]);
 
         // Processes Block
-        let process_rows = create_process_rows(sys, *sort_order);
+        let process_rows = create_process_rows(sys, self.sort_order);
         let num_processes = process_rows.len();
         self.process_scroll_state = self.process_scroll_state.content_length(num_processes);
+        if let Some((msg, timestamp)) = &self.kill_message {
+            // Nachricht nach 5 Sekunden entfernen
+            if timestamp.elapsed().as_secs() >= 5 {
+                self.kill_message = None;
+            } else {
+                let msg_color = if msg.starts_with('✅') {
+                    Color::Green
+                } else {
+                    Color::Red
+                };
+                let area = Rect::new(
+                    chunks[4].x,
+                    chunks[4].y.saturating_sub(2),
+                    chunks[4].width,
+                    1,
+                );
+                let paragraph = Paragraph::new(msg.clone()).style(Style::default().fg(msg_color));
+                frame.render_widget(paragraph, area);
+            }
+        }
+
+        let block_title = if self.mode == Mode::Input {
+            format!("Enter PID to kill: {}", self.input)
+        } else if let Some((msg, color)) = &self.process_status {
+            Span::styled(msg.clone(), Style::default().fg(*color)).to_string()
+        } else {
+            "Processes".to_string()
+        };
 
         let processes_block = Block::default()
-            .title("Processes")
+            .title(block_title)
             .title_bottom(
                 Line::from(vec![
                     Span::styled("C", Style::default().fg(Color::Yellow)),
@@ -567,7 +604,7 @@ impl App {
         );
 
         // Network Diagram Block
-        let network_diagram = network_manager.get_network_widget();
+        let network_diagram = self.network_manager.get_network_widget();
         frame.render_widget(network_diagram, chunks[5]);
 
         // Host Info Block
@@ -614,7 +651,7 @@ impl App {
             }
         }
 
-        if *show_popup {
+        if self.show_popup {
             const POPUP_WIDTH: u16 = 35;
             const POPUP_HEIGHT: u16 = 5;
 
@@ -671,7 +708,7 @@ impl App {
             frame.render_widget(popup_paragraph, popup_area);
         }
 
-        if *show_manual {
+        if self.show_manual {
             let manual_area = Rect::new(
                 (area.width.saturating_sub(60)) / 2,
                 (area.height.saturating_sub(20)) / 2,
