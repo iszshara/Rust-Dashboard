@@ -14,11 +14,11 @@ This project provides a real-time dashboard to monitor various system metrics, i
 - **Process List:** Lists running processes with details such as PID, CPU usage, memory usage, and name. Processes can be sorted by different criteria.
 - **System Information:** Displays host information, including operating system, kernel version, and uptime.
 - **Interactive UI:** Allows switching between different views, scrolling through lists, and adjusting the data refresh interval.
+- **Killing Processes:** You are now able to kill processes directly from the dashboard.
 
 ## Upcoming
 
 - Improve fetching mechanism
-- Add kill option for processes
 - Add option to choose between a second layout (or only one box at the time)
 
 ## Usage
@@ -49,6 +49,7 @@ To run the dashboard, you can either build it from the source or download a pre-
 -   **`i`**: Switch the selected network interface.
 -   **`c`**, **`m`**, **`p`**, **`n`**: Sort the process list by CPU, Memory, PID, or Name, respectively.
 -   **`Esc`**: Show/hide the options menu.
+-   **`M`**: Switches to Input Mode and lets you directly type into the heading of the Processes Block.
 
 ## Dependencies
 
