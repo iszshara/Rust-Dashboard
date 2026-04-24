@@ -108,6 +108,15 @@ impl Default for App {
 /// The UI thread reads from the shared state and handles user input without blocking on data fetching.
 pub async fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
     color_eyre::install()?;
+
+    // Ensure terminal is restored even on panic
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = disable_raw_mode();
+        let _ = crossterm::execute!(io::stdout(), LeaveAlternateScreen);
+        default_hook(info);
+    }));
+
     enable_raw_mode()?;
 
     let mut stdout = io::stdout();
@@ -117,7 +126,7 @@ pub async fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
 
     let sys = Arc::new(Mutex::new(System::new_all()));
     {
-        let mut s = sys.lock().unwrap();
+        let mut s = sys.lock().unwrap_or_else(|e| e.into_inner());
         s.refresh_all();
     }
 
@@ -132,7 +141,7 @@ pub async fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
             let interval = *rx.borrow();
             tokio::select! {
                 _ = tokio::time::sleep(Duration::from_millis(interval)) => {
-                    let mut s = sys_bg.lock().unwrap();
+                    let mut s = sys_bg.lock().unwrap_or_else(|e| e.into_inner());
                     s.refresh_all();
                 }
                 result = rx.changed() => {
@@ -183,7 +192,7 @@ impl App {
                 let evt = event::read()?;
                 // Only handle and redraw for key events, ignore mouse events
                 if matches!(&evt, Event::Key(_)) {
-                    let mut s = sys.lock().unwrap();
+                    let mut s = sys.lock().unwrap_or_else(|e| e.into_inner());
                     self.handle_event(evt, &mut s)?;
                     let _ = interval_tx.send(self.current_fetch_interval);
                     needs_redraw = true;
@@ -199,7 +208,7 @@ impl App {
 
             if needs_redraw {
                 needs_redraw = false;
-                let mut s = sys.lock().unwrap();
+                let mut s = sys.lock().unwrap_or_else(|e| e.into_inner());
                 terminal.draw(|frame| {
                     let size = frame.area();
                     if size.width < MIN_WIDTH || size.height < MIN_HEIGHT {
@@ -221,7 +230,9 @@ impl App {
             // Input-Mode has priority (kill process)
             if self.mode == Mode::Input {
                 match code {
-                    KeyCode::Char(c) if c.is_ascii_digit() => self.input.push(c),
+                    KeyCode::Char(c) if c.is_ascii_digit() && self.input.len() < 10 => {
+                        self.input.push(c);
+                    }
                     KeyCode::Backspace => {
                         self.input.pop();
                     }

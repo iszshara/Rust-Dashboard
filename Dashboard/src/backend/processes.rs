@@ -143,8 +143,20 @@ pub fn create_process_rows_filtered(
 /// Attempts to kill a process by PID.
 /// First tries SIGTERM (graceful shutdown), falls back to SIGKILL if the signal
 /// is not supported by the platform.
+/// Refuses to kill PID 0/1 (kernel/init) and the dashboard's own process.
 /// Returns a status message describing the result.
 pub fn kill_process(sys: &mut System, pid_to_kill: usize) -> String {
+    // Protect critical system processes
+    if pid_to_kill <= 1 {
+        return format!("Refused: PID {} is a protected system process", pid_to_kill);
+    }
+
+    // Protect the dashboard itself
+    let own_pid = std::process::id() as usize;
+    if pid_to_kill == own_pid {
+        return format!("Refused: PID {} is the dashboard itself", pid_to_kill);
+    }
+
     sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
     let pid = Pid::from(pid_to_kill);
