@@ -2,7 +2,7 @@
 //! This module fetches and formats process information from the system,  
 //! including PID, name, status, CPU usage, and memory usage.  
 //! It allows sorting of processes based on various criteria such as CPU usage, memory usage, PID, and name.  
-use crate::backend::converter::byte_to_gib;
+use crate::backend::converter::format_bytes;
 use ratatui::{
     style::{Color, Style},
     widgets::{Cell, Row},
@@ -40,10 +40,12 @@ impl Default for SortOrder {
 // It then gets converted into a String to return a new owned String.
 // Short: Truncates a string to a maximum length and appends "..." if it exceeds that length.
 fn truncate_string(s: &str, max_length: usize) -> String {
-    if s.len() <= max_length {
+    let char_count = s.chars().count();
+    if char_count <= max_length {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_length - 3])
+        let truncated: String = s.chars().take(max_length - 3).collect();
+        format!("{truncated}...")
     }
 }
 
@@ -56,7 +58,26 @@ fn truncate_string(s: &str, max_length: usize) -> String {
 /// A vector of `Row` instances, each representing a process with its PID, name, status, CPU usage, and memory usage.
 /// The rows are styled with a default style and the header row is styled with a yellow foreground color.
 pub fn create_process_rows(sys: &System, sort_order: SortOrder) -> Vec<Row<'static>> {
-    let mut processes: Vec<(&Pid, &Process)> = sys.processes().iter().collect();
+    create_process_rows_filtered(sys, sort_order, "")
+}
+
+pub fn create_process_rows_filtered(
+    sys: &System,
+    sort_order: SortOrder,
+    filter: &str,
+) -> Vec<Row<'static>> {
+    let filter_lower = filter.to_lowercase();
+    let mut processes: Vec<(&Pid, &Process)> = sys
+        .processes()
+        .iter()
+        .filter(|(_, p)| {
+            filter_lower.is_empty()
+                || p.name()
+                    .to_string_lossy()
+                    .to_lowercase()
+                    .contains(&filter_lower)
+        })
+        .collect();
     match sort_order {
         SortOrder::CpuAsc => {
             processes.sort_by(|a, b| {
@@ -113,32 +134,37 @@ pub fn create_process_rows(sys: &System, sort_order: SortOrder) -> Vec<Row<'stat
             Cell::from(truncate_string(&process.name().to_string_lossy(), 30)),
             Cell::from(format!("{:?}", process.status())),
             Cell::from(format!("{:.2}", process.cpu_usage())),
-            Cell::from(format!("{:.2} GB", byte_to_gib(process.memory()))),
+            Cell::from(format_bytes(process.memory())),
         ])
     }));
     rows
 }
 
-pub fn kill_process(sys: &mut System, pid_to_kill: usize, signal: Signal) -> Option<String> {
+/// Attempts to kill a process by PID.
+/// First tries SIGTERM (graceful shutdown), falls back to SIGKILL if the signal
+/// is not supported by the platform.
+/// Returns a status message describing the result.
+pub fn kill_process(sys: &mut System, pid_to_kill: usize) -> String {
     sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
-    if let Some(process) = sys.process(pid_to_kill.into()) {
+    let pid = Pid::from(pid_to_kill);
+    if let Some(process) = sys.process(pid) {
         let name = process.name().to_string_lossy().to_string();
 
-        let killed = match process.kill_with(signal) {
-            Some(true) => {
-                sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-                sys.process(pid_to_kill.into()).is_none()
-            }
-            _ => false,
+        // Try SIGTERM first (graceful), fall back to SIGKILL
+        let signal_sent = match process.kill_with(Signal::Term) {
+            Some(true) => true,
+            // SIGTERM not supported on this platform, try SIGKILL
+            None => process.kill_with(Signal::Kill).unwrap_or(false),
+            Some(false) => false,
         };
 
-        if killed {
-            Some(format!("Killed process {} ({})", pid_to_kill, name))
+        if signal_sent {
+            format!("Signal sent to process {} ({})", pid_to_kill, name)
         } else {
-            Some(format!("Failed to kill process {} ({})", pid_to_kill, name))
+            format!("Failed to kill process {} ({})", pid_to_kill, name)
         }
     } else {
-        Some(format!("No process found with PID {}", pid_to_kill))
+        format!("No process found with PID {}", pid_to_kill)
     }
 }

@@ -2,9 +2,9 @@
 /// It is responsible for running the terminal UI, managing user interactions, and updating the display based on system information.
 /// It uses the `ratatui` crate for rendering the UI and `sysinfo` for fetching system data.
 /// System data is fetched asynchronously in a background tokio task.
-use crate::backend::host::host_info_table;
+use crate::backend::host::HostInfo;
 use crate::backend::processes::kill_process;
-use crate::backend::processes::{SortOrder, create_process_rows};
+use crate::backend::processes::{SortOrder, create_process_rows_filtered};
 use crate::backend::system_info::SystemInfo;
 use crate::{
     backend::{
@@ -37,7 +37,7 @@ use ratatui::{
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use sysinfo::{Signal, System};
+use sysinfo::System;
 
 const MIN_WIDTH: u16 = 110;
 const MIN_HEIGHT: u16 = 24;
@@ -52,6 +52,7 @@ enum ActiveBlock {
 enum Mode {
     Normal,
     Input,
+    Search,
 }
 
 struct App {
@@ -70,8 +71,10 @@ struct App {
     show_manual: bool,
     sort_order: SortOrder,
     network_manager: NetworkManager,
-    process_status: Option<(String, Color)>,
     kill_message: Option<(String, Instant)>,
+    cached_network_text: String,
+    host_info: HostInfo,
+    search_query: String,
 }
 
 impl Default for App {
@@ -92,8 +95,10 @@ impl Default for App {
             show_manual: false,
             sort_order: SortOrder::default(),
             network_manager: NetworkManager::default(),
-            process_status: None,
             kill_message: None,
+            cached_network_text: String::new(),
+            host_info: HostInfo::new(),
+            search_query: String::new(),
         }
     }
 }
@@ -106,11 +111,7 @@ pub async fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
     enable_raw_mode()?;
 
     let mut stdout = io::stdout();
-    crossterm::execute!(
-        stdout,
-        EnterAlternateScreen,
-        crossterm::event::EnableMouseCapture
-    )?;
+    crossterm::execute!(stdout, EnterAlternateScreen)?;
 
     terminal.clear()?;
 
@@ -152,11 +153,7 @@ pub async fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
     let _ = bg_handle.await;
 
     // Cleanup
-    crossterm::execute!(
-        io::stdout(),
-        LeaveAlternateScreen,
-        crossterm::event::DisableMouseCapture
-    )?;
+    crossterm::execute!(io::stdout(), LeaveAlternateScreen)?;
     disable_raw_mode()?;
 
     app_result
@@ -196,6 +193,7 @@ impl App {
             // Tick abgelaufen -> neue Daten verfuegbar, neu zeichnen
             if last_tick.elapsed() >= tick_rate {
                 last_tick = Instant::now();
+                self.cached_network_text = self.network_manager.format_network();
                 needs_redraw = true;
             }
 
@@ -220,7 +218,7 @@ impl App {
                 return Ok(());
             }
 
-            // Input-Mode has priority
+            // Input-Mode has priority (kill process)
             if self.mode == Mode::Input {
                 match code {
                     KeyCode::Char(c) if c.is_ascii_digit() => self.input.push(c),
@@ -229,15 +227,28 @@ impl App {
                     }
                     KeyCode::Enter => {
                         if let Ok(pid) = self.input.parse::<usize>() {
-                            if let Some(msg) = kill_process(sys, pid, Signal::Kill) {
-                                self.kill_message = Some((msg, Instant::now()));
-                            }
+                            let msg = kill_process(sys, pid);
+                            self.kill_message = Some((msg, Instant::now()));
                         }
                         self.mode = Mode::Normal;
                     }
                     KeyCode::Esc => self.mode = Mode::Normal,
                     _ => {}
                 }
+                return Ok(());
+            }
+
+            // Search-Mode (filter processes by name)
+            if self.mode == Mode::Search {
+                match code {
+                    KeyCode::Char(c) => self.search_query.push(c),
+                    KeyCode::Backspace => {
+                        self.search_query.pop();
+                    }
+                    KeyCode::Esc | KeyCode::Enter => self.mode = Mode::Normal,
+                    _ => {}
+                }
+                self.process_scroll = 0;
                 return Ok(());
             }
 
@@ -329,6 +340,11 @@ impl App {
                 KeyCode::Char('M') => {
                     self.mode = Mode::Input;
                     self.input.clear();
+                }
+                KeyCode::Char('/') => {
+                    self.mode = Mode::Search;
+                    self.search_query.clear();
+                    self.process_scroll = 0;
                 }
                 _ => {}
             }
@@ -506,7 +522,11 @@ impl App {
     }
 
     fn render_cpu_cores(&mut self, frame: &mut Frame, sys: &System, area: Rect) {
-        self.cpu_scroll_state = self.cpu_scroll_state.content_length(sys.get_cpus().len());
+        let cpu_count = sys.get_cpus().len();
+        let visible_lines = area.height.saturating_sub(2) as usize; // -2 for borders
+        let max_scroll = cpu_count.saturating_sub(visible_lines);
+        self.cpu_scroll = self.cpu_scroll.min(max_scroll);
+        self.cpu_scroll_state = self.cpu_scroll_state.content_length(cpu_count);
 
         let cpu_block = Block::default()
             .title("CPU Core Usage ")
@@ -543,9 +563,9 @@ impl App {
         frame.render_widget(memory_table, area);
     }
 
-    fn render_network_info(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_network_info(&self, frame: &mut Frame, area: Rect) {
         let network_block = Block::default().title("Network").borders(Borders::ALL);
-        let network_widget = Paragraph::new(self.network_manager.format_network())
+        let network_widget = Paragraph::new(self.cached_network_text.clone())
             .block(network_block)
             .wrap(Wrap { trim: true });
         frame.render_widget(network_widget, area);
@@ -557,29 +577,32 @@ impl App {
     }
 
     fn render_processes(&mut self, frame: &mut Frame, sys: &System, area: Rect) {
-        let process_rows = create_process_rows(sys, self.sort_order);
+        let process_rows = create_process_rows_filtered(sys, self.sort_order, &self.search_query);
         let num_processes = process_rows.len();
+        let table_height = area.height as usize - 2;
+        let max_scroll = num_processes.saturating_sub(table_height);
+        self.process_scroll = self.process_scroll.min(max_scroll);
         self.process_scroll_state = self.process_scroll_state.content_length(num_processes);
 
-        if let Some((msg, timestamp)) = &self.kill_message {
+        if let Some((_, timestamp)) = &self.kill_message {
             if timestamp.elapsed().as_secs() >= 5 {
                 self.kill_message = None;
-            } else {
-                let msg_color = if msg.starts_with('✅') {
-                    Color::Green
-                } else {
-                    Color::Red
-                };
-                let msg_area = Rect::new(area.x, area.y.saturating_sub(2), area.width, 1);
-                let paragraph = Paragraph::new(msg.clone()).style(Style::default().fg(msg_color));
-                frame.render_widget(paragraph, msg_area);
             }
         }
 
         let block_title = if self.mode == Mode::Input {
-            format!("Enter PID to kill: {}", self.input)
-        } else if let Some((msg, color)) = &self.process_status {
-            Span::styled(msg.clone(), Style::default().fg(*color)).to_string()
+            format!("Enter PID to kill: {}█", self.input)
+        } else if self.mode == Mode::Search {
+            format!("Search: {}█", self.search_query)
+        } else if !self.search_query.is_empty() {
+            format!("Processes [filter: {}] ({} results)", self.search_query, num_processes.saturating_sub(1))
+        } else if let Some((msg, _)) = &self.kill_message {
+            let color = if msg.starts_with("Failed") || msg.starts_with("No process") {
+                Color::Red
+            } else {
+                Color::Green
+            };
+            Span::styled(format!("Processes | {}", msg), Style::default().fg(color)).to_string()
         } else {
             "Processes".to_string()
         };
@@ -606,7 +629,6 @@ impl App {
                 Style::default()
             });
 
-        let table_height = area.height as usize - 2;
         let visible_rows = process_rows
             .into_iter()
             .skip(self.process_scroll)
@@ -644,8 +666,8 @@ impl App {
         let host_info_block = Block::default()
             .title("Host System Information ")
             .borders(Borders::ALL);
-        let host_info_table = host_info_table().block(host_info_block);
-        frame.render_widget(host_info_table, area);
+        let table = self.host_info.to_table().block(host_info_block);
+        frame.render_widget(table, area);
     }
 
     fn render_welcome_popup(&self, frame: &mut Frame, area: Rect) {
@@ -697,12 +719,14 @@ impl App {
             20,
         );
 
-        let manual_description: [&str; 9] = [
+        let manual_description: [&str; 11] = [
             "Press 'i' to switch network interface\n",
             "Press 'c' to sort by CPU usage\n",
             "Press 'm' to sort by Memory usage\n",
             "Press 'p' to sort by PID\n",
             "Press 'n' to sort by Name\n",
+            "Press '/' to search/filter processes\n",
+            "Press 'M' to kill a process by PID\n",
             "Press 'Tab' to switch between CPU and Processes view\n",
             "Use Up/Down arrows to scroll through CPU or Processes\n",
             "Use Left/Right arrows to adjust fetch interval\n",
