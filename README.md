@@ -4,7 +4,7 @@ A terminal-based system monitoring dashboard written in Rust.
 
 ## About the Project
 
-This project provides a real-time dashboard to monitor various system metrics, including CPU usage, memory consumption, network activity, running processes, and general system information. The user interface is built using the `ratatui` crate, providing an interactive and responsive experience in the terminal.
+This project provides a real-time dashboard to monitor various system metrics, including CPU usage, memory consumption, network activity, running processes, and general system information. The user interface is built using the `ratatui` crate, as well as some `crossterm` features, providing an interactive and responsive experience in the terminal.
 
 ## Features
 
@@ -15,11 +15,11 @@ This project provides a real-time dashboard to monitor various system metrics, i
 - **System Information:** Displays host information, including operating system, kernel version, and uptime.
 - **Interactive UI:** Allows switching between different views, scrolling through lists, and adjusting the data refresh interval.
 - **Killing Processes:** You are now able to kill processes directly from the dashboard.
+- **Asynchronous Fetching:** The Performance of the App is much smoother now.
 
 ## Upcoming
 
-- Improve fetching mechanism
-- Add option to choose between a second layout (or only one box at the time)
+- There are currently no updates planned
 
 ## Usage
 
@@ -81,4 +81,4 @@ This will open your Standard Browser with the code documentation.
 
 ## Credits
 
-Thanks to @orhundev's YouTube Channel Videos on TUI applications I learned a lot on how to use ratatui and was able to write my first Rust project, as well as my first project overall. There is still a few things to implement, but this version will cut it for the time being.
+Thanks to @orhundev's YouTube Channel Videos on TUI applications I learned a lot on how to use ratatui and was able to write my first Rust project, as well as my first project overall. 
