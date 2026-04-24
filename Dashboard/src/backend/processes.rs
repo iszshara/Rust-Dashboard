@@ -119,9 +119,8 @@ pub fn create_process_rows(sys: &System, sort_order: SortOrder) -> Vec<Row<'stat
     rows
 }
 
-pub fn kill_process(pid_to_kill: usize, signal: Signal) -> Option<String> {
-    let mut sys = System::new_all();
-    sys.refresh_all();
+pub fn kill_process(sys: &mut System, pid_to_kill: usize, signal: Signal) -> Option<String> {
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
     if let Some(process) = sys.process(pid_to_kill.into()) {
         let name = process.name().to_string_lossy().to_string();

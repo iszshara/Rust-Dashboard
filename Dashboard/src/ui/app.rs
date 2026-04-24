@@ -1,7 +1,7 @@
 //! This module contains the main application logic for the Rust Dashboard UI.
-/// It is responsible for running the terminal UI, managing user interactions, and updating the display based on system information.  
-/// It uses the `ratatui` crate for rendering the UI and `sysinfo` for fetching system data.  
-///
+/// It is responsible for running the terminal UI, managing user interactions, and updating the display based on system information.
+/// It uses the `ratatui` crate for rendering the UI and `sysinfo` for fetching system data.
+/// System data is fetched asynchronously in a background tokio task.
 use crate::backend::host::host_info_table;
 use crate::backend::processes::kill_process;
 use crate::backend::processes::{SortOrder, create_process_rows};
@@ -29,13 +29,13 @@ use ratatui::widgets::{
 use ratatui::widgets::{ScrollbarOrientation, ScrollbarState};
 use ratatui::{
     DefaultTerminal, Frame,
-    buffer::Buffer,
     crossterm::event::{self, Event, KeyCode, KeyEvent},
     layout::Alignment,
     prelude::*,
     style::Style,
 };
 use std::io;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use sysinfo::{Signal, System};
 
@@ -54,7 +54,6 @@ enum Mode {
     Input,
 }
 
-//#[allow(dead_code)] // used to get rid of annoying warnings
 struct App {
     running: bool,
     active_block: ActiveBlock,
@@ -84,7 +83,7 @@ impl Default for App {
             process_scroll_state: ScrollbarState::default(),
             cpu_scroll: 0,
             process_scroll: 0,
-            current_fetch_interval: 1000, // Initial 1000ms fetch interval
+            current_fetch_interval: 1000,
             minus_button_rect: Rect::default(),
             plus_button_rect: Rect::default(),
             mode: Mode::Normal,
@@ -99,32 +98,12 @@ impl Default for App {
     }
 }
 
-/// run_ui() is the entry point for the terminal UI.  
-/// It initializes the necessary components and starts the main loop,  
-/// which renders and updates the terminal UI.  
-///
-/// color_eyre is called to configure error reporting.  
-///
-/// ratatui::init() is used to prepare the terminal for display.  
-///
-/// let mut sys = System::new_all();
-/// sys.refresh_all();
-/// creates a new System object that collects data about the system.
-///
-/// let result = run(...) starts the main loop.
-/// It renders the UI and updates the system information at regular intervals.  
-/// It takes the terminal and system information as parameters.  
-/// # Example
-/// ```
-/// use linux_dashboard::ui::app::run_ui;
-/// use color_eyre::Result;
-/// let result = run_ui();
-/// assert!(result.is_ok());
-/// ```
-///
-pub fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
+/// Entry point for the terminal UI.
+/// Spawns a background tokio task that refreshes system data at the configured interval.
+/// The UI thread reads from the shared state and handles user input without blocking on data fetching.
+pub async fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
     color_eyre::install()?;
-    enable_raw_mode()?; // Raw Mode aktivieren
+    enable_raw_mode()?;
 
     let mut stdout = io::stdout();
     crossterm::execute!(
@@ -135,126 +114,144 @@ pub fn run_ui(mut terminal: DefaultTerminal) -> Result<()> {
 
     terminal.clear()?;
 
-    let mut sys = System::new_all();
-    sys.refresh_all();
+    let sys = Arc::new(Mutex::new(System::new_all()));
+    {
+        let mut s = sys.lock().unwrap();
+        s.refresh_all();
+    }
+
+    // Channel to communicate the current fetch interval to the background task
+    let (interval_tx, interval_rx) = tokio::sync::watch::channel(1000u64);
+
+    // Background task: refreshes system data at the configured interval
+    let sys_bg = Arc::clone(&sys);
+    let bg_handle = tokio::spawn(async move {
+        let mut rx = interval_rx;
+        loop {
+            let interval = *rx.borrow();
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_millis(interval)) => {
+                    let mut s = sys_bg.lock().unwrap();
+                    s.refresh_all();
+                }
+                result = rx.changed() => {
+                    if result.is_err() {
+                        // Sender dropped, exit
+                        break;
+                    }
+                }
+            }
+        }
+    });
 
     let mut app = App::default();
-    let app_result = app.run(&mut terminal, &mut sys);
+    let app_result = app.run(&mut terminal, &sys, &interval_tx);
 
-    // Aufräumen
+    // Signal the background task to stop by dropping the sender
+    drop(interval_tx);
+    let _ = bg_handle.await;
+
+    // Cleanup
     crossterm::execute!(
         io::stdout(),
         LeaveAlternateScreen,
         crossterm::event::DisableMouseCapture
     )?;
-    disable_raw_mode()?; // Raw Mode deaktivieren
+    disable_raw_mode()?;
 
     app_result
 }
 
-/// Runtime function to render the Terminal and to refresh it.  
-/// It sets an initial and final tick rate.  
-/// The user interface is then re-rendered in a loop at the respective interval with information such as CPU usage.  
-/// This is interrupted if there is a "KeyEvent" within a 50 ms time span, where 'q' is defined to exit the loop.  
 impl App {
-    pub fn run(&mut self, terminal: &mut DefaultTerminal, sys: &mut System) -> Result<()> {
+    pub fn run(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+        sys: &Arc<Mutex<System>>,
+        interval_tx: &tokio::sync::watch::Sender<u64>,
+    ) -> Result<()> {
         let mut last_tick = Instant::now();
-
-        let tick_rate = Duration::from_millis(self.current_fetch_interval);
+        let mut needs_redraw = true;
 
         loop {
             if !self.running {
                 return Ok(());
             }
+
+            let tick_rate = Duration::from_millis(self.current_fetch_interval);
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
-                .unwrap_or_else(|| Duration::from_secs(0));
+                .unwrap_or(Duration::ZERO);
 
             if crossterm::event::poll(timeout)? {
                 let evt = event::read()?;
-                self.handle_event(evt)?;
-            }
-
-            if last_tick.elapsed() >= tick_rate {
-                sys.refresh_all();
-                last_tick = Instant::now();
-            }
-
-            terminal.draw(|frame| {
-                let size = frame.area();
-                if size.width < MIN_WIDTH || size.height < MIN_HEIGHT {
-                    let current_width_style = if size.width >= MIN_WIDTH {
-                        Style::default().fg(Color::Green)
-                    } else {
-                        Style::default().fg(Color::Red)
-                    };
-                    let current_height_style = if size.height >= MIN_HEIGHT {
-                        Style::default().fg(Color::Green)
-                    } else {
-                        Style::default().fg(Color::Red)
-                    };
-
-                    let message_text = Text::from(vec![
-                        Line::from(Span::styled(
-                            "Terminal window is too small!",
-                            Style::default().fg(Color::Red),
-                        )),
-                        Line::from(""), // Empty line for spacing
-                        Line::from(vec![
-                            Span::raw("Current size: "),
-                            Span::styled(format!("{}", size.width), current_width_style),
-                            Span::raw("x"),
-                            Span::styled(format!("{}", size.height), current_height_style),
-                        ]),
-                        Line::from(vec![
-                            Span::raw("Required: "),
-                            Span::styled(
-                                format!("{MIN_WIDTH}x{MIN_HEIGHT}"),
-                                Style::default().fg(Color::Yellow),
-                            ),
-                        ]),
-                        Line::from(""), // Empty line for spacing
-                        Line::from(Span::raw("Please adjust terminal size.")),
-                    ])
-                    .alignment(Alignment::Center);
-
-                    let paragraph = Paragraph::new(message_text)
-                        .alignment(Alignment::Center)
-                        .wrap(Wrap { trim: true })
-                        .block(
-                            Block::default()
-                                .borders(Borders::ALL)
-                                .border_type(BorderType::Rounded)
-                                .title("Error")
-                                .title_alignment(Alignment::Center)
-                                .style(Style::default().fg(Color::Red)),
-                        );
-                    frame.render_widget(Clear, size);
-                    frame.render_widget(paragraph, size);
-                } else {
-                    self.render(frame, sys)
+                // Only handle and redraw for key events, ignore mouse events
+                if matches!(&evt, Event::Key(_)) {
+                    let mut s = sys.lock().unwrap();
+                    self.handle_event(evt, &mut s)?;
+                    let _ = interval_tx.send(self.current_fetch_interval);
+                    needs_redraw = true;
                 }
-            })?;
+            }
+
+            // Tick abgelaufen -> neue Daten verfuegbar, neu zeichnen
+            if last_tick.elapsed() >= tick_rate {
+                last_tick = Instant::now();
+                needs_redraw = true;
+            }
+
+            if needs_redraw {
+                needs_redraw = false;
+                let mut s = sys.lock().unwrap();
+                terminal.draw(|frame| {
+                    let size = frame.area();
+                    if size.width < MIN_WIDTH || size.height < MIN_HEIGHT {
+                        self.render_size_error(frame, size);
+                    } else {
+                        self.render(frame, &mut s);
+                    }
+                })?;
+            }
         }
     }
 
-    pub fn handle_event(&mut self, evt: Event) -> Result<()> {
+    pub fn handle_event(&mut self, evt: Event, sys: &mut System) -> Result<()> {
         if let Event::Key(KeyEvent { code, kind, .. }) = evt {
             if kind != KeyEventKind::Press {
-                return Ok(()); // Nur Press-Events behandeln
+                return Ok(());
             }
 
+            // Input-Mode has priority
+            if self.mode == Mode::Input {
+                match code {
+                    KeyCode::Char(c) if c.is_ascii_digit() => self.input.push(c),
+                    KeyCode::Backspace => {
+                        self.input.pop();
+                    }
+                    KeyCode::Enter => {
+                        if let Ok(pid) = self.input.parse::<usize>() {
+                            if let Some(msg) = kill_process(sys, pid, Signal::Kill) {
+                                self.kill_message = Some((msg, Instant::now()));
+                            }
+                        }
+                        self.mode = Mode::Normal;
+                    }
+                    KeyCode::Esc => self.mode = Mode::Normal,
+                    _ => {}
+                }
+                return Ok(());
+            }
+
+            // Normal Mode
             match code {
-                // Normal Mode
                 KeyCode::Char('q') => self.running = false,
                 KeyCode::Enter => {
                     if self.show_popup {
-                        self.show_popup = false; // Start-Popup schließen
+                        self.show_popup = false;
                     }
                 }
                 KeyCode::Esc => {
                     if !self.show_popup {
-                        self.show_manual = !self.show_manual; // Manual toggle nur wenn Popup weg ist
+                        self.show_manual = !self.show_manual;
                     }
                 }
                 KeyCode::Char('i') => {
@@ -329,58 +326,105 @@ impl App {
                     self.current_fetch_interval =
                         self.current_fetch_interval.saturating_add(100).min(60000);
                 }
-
-                // Start Input Mode
                 KeyCode::Char('M') => {
-                    if self.mode == Mode::Normal {
-                        self.mode = Mode::Input;
-                        self.input.clear();
-                    } else {
-                        self.mode = Mode::Normal;
-                    }
+                    self.mode = Mode::Input;
+                    self.input.clear();
                 }
                 _ => {}
-            }
-
-            // Input Mode
-            if self.mode == Mode::Input {
-                match code {
-                    KeyCode::Char(c) if c.is_ascii_digit() => self.input.push(c),
-                    KeyCode::Backspace => {
-                        self.input.pop();
-                    }
-                    KeyCode::Enter => {
-                        if let Ok(pid) = self.input.parse::<usize>() {
-                            if let Some(msg) = kill_process(pid, Signal::Kill) {
-                                self.kill_message = Some((msg, Instant::now())); // Nachricht + Timestamp
-                            }
-                        }
-                        self.mode = Mode::Normal;
-                    }
-                    KeyCode::Esc => self.mode = Mode::Normal,
-                    _ => {}
-                }
             }
         }
 
         Ok(())
     }
 
-    // render() draws the frame of the TUI app and creates various objects such as paragraphs, blocks, etc.
+    fn render_size_error(&self, frame: &mut Frame, size: Rect) {
+        let current_width_style = if size.width >= MIN_WIDTH {
+            Style::default().fg(Color::Green)
+        } else {
+            Style::default().fg(Color::Red)
+        };
+        let current_height_style = if size.height >= MIN_HEIGHT {
+            Style::default().fg(Color::Green)
+        } else {
+            Style::default().fg(Color::Red)
+        };
+
+        let message_text = Text::from(vec![
+            Line::from(Span::styled(
+                "Terminal window is too small!",
+                Style::default().fg(Color::Red),
+            )),
+            Line::from(""),
+            Line::from(vec![
+                Span::raw("Current size: "),
+                Span::styled(format!("{}", size.width), current_width_style),
+                Span::raw("x"),
+                Span::styled(format!("{}", size.height), current_height_style),
+            ]),
+            Line::from(vec![
+                Span::raw("Required: "),
+                Span::styled(
+                    format!("{MIN_WIDTH}x{MIN_HEIGHT}"),
+                    Style::default().fg(Color::Yellow),
+                ),
+            ]),
+            Line::from(""),
+            Line::from(Span::raw("Please adjust terminal size.")),
+        ])
+        .alignment(Alignment::Center);
+
+        let paragraph = Paragraph::new(message_text)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true })
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .title("Error")
+                    .title_alignment(Alignment::Center)
+                    .style(Style::default().fg(Color::Red)),
+            );
+        frame.render_widget(Clear, size);
+        frame.render_widget(paragraph, size);
+    }
+
     fn render(&mut self, frame: &mut Frame, sys: &mut System) {
-        // Get the entire terminal area
         let area = frame.area();
 
-        // Create outer frame
+        self.render_outer_frame(frame, area);
+        self.render_top_bar(frame, area);
+
+        let inner_area = area.inner(Margin {
+            vertical: 1,
+            horizontal: 1,
+        });
+        let chunks = layout::terminal_layout(inner_area);
+
+        self.render_cpu_gauge(frame, sys, chunks[0]);
+        self.render_cpu_cores(frame, sys, chunks[1]);
+        self.render_network_info(frame, chunks[2]);
+        self.render_memory(frame, sys, chunks[3]);
+        self.render_processes(frame, sys, chunks[4]);
+        self.render_network_chart(frame, chunks[5]);
+        self.render_host_info(frame, chunks[6]);
+
+        if self.show_popup {
+            self.render_welcome_popup(frame, area);
+        }
+        if self.show_manual {
+            self.render_manual(frame, area);
+        }
+    }
+
+    fn render_outer_frame(&self, frame: &mut Frame, area: Rect) {
         let outer_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            // Top left: System Monitor
             .title(Span::styled("System Monitor", Style::default()))
             .title_alignment(Alignment::Left)
             .title_bottom(
                 Line::from(vec![Span::styled(
-                    format!("Press 'Esc' for options"),
+                    "Press 'Esc' for options",
                     Style::default(),
                 )])
                 .left_aligned(),
@@ -399,38 +443,32 @@ impl App {
                 )])
                 .right_aligned(),
             );
-
         frame.render_widget(outer_block, area);
+    }
 
-        // Render the top bar content (time and fetch interval)
+    fn render_top_bar(&mut self, frame: &mut Frame, area: Rect) {
         let top_bar_area = Rect::new(area.x + 1, area.y, area.width.saturating_sub(2), 1);
 
-        // Current Time (centered)
         let current_time_str = Local::now().format("%H:%M:%S").to_string();
         let time_paragraph = Paragraph::new(current_time_str).alignment(Alignment::Center);
         frame.render_widget(time_paragraph, top_bar_area);
 
-        // Fetch Interval and Buttons (right-aligned)
         let interval_display = format!("Fetch Interval: {}ms", self.current_fetch_interval);
-        let minus_btn_text: &'static str = "[ ◄";
-        let plus_btn_text: &'static str = "► ]";
+        let minus_btn_text: &str = "[ ◄";
+        let plus_btn_text: &str = "► ]";
 
-        // Calculate total width needed for right-aligned content
         let total_right_content_width = minus_btn_text.len() as u16
             + 1
             + interval_display.len() as u16
             + 1
-            + plus_btn_text.len() as u16; // +1 for spaces between elements
+            + plus_btn_text.len() as u16;
 
-        // Calculate starting X for right-aligned content
         let right_content_start_x =
             top_bar_area.x + top_bar_area.width.saturating_sub(total_right_content_width);
         let y_pos = top_bar_area.y;
 
-        // Calculate Rects for buttons
         self.minus_button_rect =
             Rect::new(right_content_start_x, y_pos, minus_btn_text.len() as u16, 1);
-
         self.plus_button_rect = Rect::new(
             right_content_start_x
                 + minus_btn_text.len() as u16
@@ -453,15 +491,21 @@ impl App {
         let fetch_interval_paragraph =
             Paragraph::new(fetch_interval_spans).alignment(Alignment::Right);
         frame.render_widget(fetch_interval_paragraph, top_bar_area);
+    }
 
-        // Create inner layout (within the outer frame)
-        let inner_area = area.inner(Margin {
-            vertical: 1,
-            horizontal: 1,
-        }); // Leave space for the frame
-        let chunks = layout::terminal_layout(inner_area);
+    fn render_cpu_gauge(&self, frame: &mut Frame, sys: &System, area: Rect) {
+        let cpu_gauge = Gauge::default()
+            .block(
+                Block::default()
+                    .title(format_cpu_name(sys))
+                    .borders(Borders::ALL),
+            )
+            .gauge_style(Style::default().fg(Color::LightBlue).bg(Color::Gray))
+            .percent(sys.global_cpu_usage() as u16);
+        frame.render_widget(cpu_gauge, area);
+    }
 
-        // CPU Usage
+    fn render_cpu_cores(&mut self, frame: &mut Frame, sys: &System, area: Rect) {
         self.cpu_scroll_state = self.cpu_scroll_state.content_length(sys.get_cpus().len());
 
         let cpu_block = Block::default()
@@ -476,51 +520,48 @@ impl App {
             .block(cpu_block)
             .wrap(Wrap { trim: true })
             .scroll((self.cpu_scroll as u16, 0));
-        frame.render_widget(cpu_widget, chunks[1]);
+        frame.render_widget(cpu_widget, area);
         frame.render_stateful_widget(
             Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .style(style::Color::LightBlue)
-                .begin_symbol(Some("^")) // ^
-                .end_symbol(Some("v")) // v
-                .thumb_symbol("░"), //
-            chunks[1].inner(Margin {
+                .begin_symbol(Some("^"))
+                .end_symbol(Some("v"))
+                .thumb_symbol("░"),
+            area.inner(Margin {
                 vertical: 1,
                 horizontal: 0,
             }),
             &mut self.cpu_scroll_state,
         );
+    }
 
-        // CPU Gauge
-        let cpu_gauge = Gauge::default()
-            .block(
-                Block::default()
-                    .title(format_cpu_name(sys))
-                    .borders(Borders::ALL),
-            )
-            .gauge_style(Style::default().fg(Color::LightBlue).bg(Color::Gray))
-            .percent(sys.global_cpu_usage() as u16);
-        frame.render_widget(cpu_gauge, chunks[0]);
-
-        // Memory Block
+    fn render_memory(&self, frame: &mut Frame, sys: &System, area: Rect) {
         let memory_block = Block::default()
             .title("Memory Usage ")
             .borders(Borders::ALL);
         let memory_table = ram_info_table(sys).block(memory_block);
-        frame.render_widget(memory_table, chunks[3]);
+        frame.render_widget(memory_table, area);
+    }
 
-        // Network Block
+    fn render_network_info(&mut self, frame: &mut Frame, area: Rect) {
         let network_block = Block::default().title("Network").borders(Borders::ALL);
-        let network_widget = Paragraph::new(self.network_manager.format_network(sys))
+        let network_widget = Paragraph::new(self.network_manager.format_network())
             .block(network_block)
             .wrap(Wrap { trim: true });
-        frame.render_widget(network_widget.clone(), chunks[2]);
+        frame.render_widget(network_widget, area);
+    }
 
-        // Processes Block
+    fn render_network_chart(&mut self, frame: &mut Frame, area: Rect) {
+        let network_diagram = self.network_manager.get_network_widget();
+        frame.render_widget(network_diagram, area);
+    }
+
+    fn render_processes(&mut self, frame: &mut Frame, sys: &System, area: Rect) {
         let process_rows = create_process_rows(sys, self.sort_order);
         let num_processes = process_rows.len();
         self.process_scroll_state = self.process_scroll_state.content_length(num_processes);
+
         if let Some((msg, timestamp)) = &self.kill_message {
-            // Nachricht nach 5 Sekunden entfernen
             if timestamp.elapsed().as_secs() >= 5 {
                 self.kill_message = None;
             } else {
@@ -529,14 +570,9 @@ impl App {
                 } else {
                     Color::Red
                 };
-                let area = Rect::new(
-                    chunks[4].x,
-                    chunks[4].y.saturating_sub(2),
-                    chunks[4].width,
-                    1,
-                );
+                let msg_area = Rect::new(area.x, area.y.saturating_sub(2), area.width, 1);
                 let paragraph = Paragraph::new(msg.clone()).style(Style::default().fg(msg_color));
-                frame.render_widget(paragraph, area);
+                frame.render_widget(paragraph, msg_area);
             }
         }
 
@@ -570,18 +606,18 @@ impl App {
                 Style::default()
             });
 
-        let table_height = chunks[4].height as usize - 2; // -2 for borders
+        let table_height = area.height as usize - 2;
         let visible_rows = process_rows
             .into_iter()
             .skip(self.process_scroll)
             .take(table_height);
 
         let widths = [
-            Constraint::Length(8),  // PID
-            Constraint::Length(30), // Name
-            Constraint::Length(10), // Status
-            Constraint::Length(10), // CPU
-            Constraint::Length(12), // Memory
+            Constraint::Length(8),
+            Constraint::Length(30),
+            Constraint::Length(10),
+            Constraint::Length(10),
+            Constraint::Length(12),
         ];
 
         let processes_table = Table::new(visible_rows, widths)
@@ -589,172 +625,114 @@ impl App {
             .style(Style::default().fg(Color::White))
             .block(processes_block);
 
-        frame.render_widget(processes_table, chunks[4]);
+        frame.render_widget(processes_table, area);
         frame.render_stateful_widget(
             Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .style(style::Color::LightBlue)
-                .begin_symbol(Some("^")) // ^
-                .end_symbol(Some("v")) // v
-                .thumb_symbol("░"), //
-            chunks[4].inner(Margin {
+                .begin_symbol(Some("^"))
+                .end_symbol(Some("v"))
+                .thumb_symbol("░"),
+            area.inner(Margin {
                 vertical: 1,
                 horizontal: 0,
             }),
             &mut self.process_scroll_state,
         );
+    }
 
-        // Network Diagram Block
-        let network_diagram = self.network_manager.get_network_widget();
-        frame.render_widget(network_diagram, chunks[5]);
-
-        // Host Info Block
+    fn render_host_info(&self, frame: &mut Frame, area: Rect) {
         let host_info_block = Block::default()
             .title("Host System Information ")
             .borders(Borders::ALL);
         let host_info_table = host_info_table().block(host_info_block);
-        frame.render_widget(host_info_table, chunks[6]);
+        frame.render_widget(host_info_table, area);
+    }
 
-        struct Popup<'a> {
-            title: Line<'a>,
-            content: Text<'a>,
-            border_style: Style,
-            title_style: Style,
-            style: Style,
+    fn render_welcome_popup(&self, frame: &mut Frame, area: Rect) {
+        const POPUP_WIDTH: u16 = 35;
+        const POPUP_HEIGHT: u16 = 5;
+
+        let popup_area = Rect::new(
+            (area.width.saturating_sub(POPUP_WIDTH)) / 2,
+            (area.height.saturating_sub(POPUP_HEIGHT)) / 2,
+            POPUP_WIDTH,
+            POPUP_HEIGHT,
+        );
+
+        let username = format!("Current User: {}", get_current_user());
+        let mut content = String::new();
+        content.push_str(&format!(
+            "{:-^width$}\n",
+            username,
+            width = POPUP_WIDTH as usize - 2
+        ));
+
+        let empty_lines = POPUP_HEIGHT as usize - 4;
+        for _ in 0..empty_lines {
+            content.push('\n');
         }
 
-        impl<'a> Default for Popup<'a> {
-            fn default() -> Self {
-                Popup {
-                    title: Line::from(""),
-                    content: Text::from(""),
-                    border_style: Style::default(),
-                    title_style: Style::default(),
-                    style: Style::default(),
-                }
-            }
-        }
+        let popup_block = Block::default()
+            .title_top(Line::from("Welcome to the Dashboard ").centered())
+            .title_bottom(Line::from("Press Enter to close ").centered())
+            .title_alignment(Alignment::Right)
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .style(Style::default().fg(Color::LightBlue));
 
-        impl Widget for Popup<'_> {
-            fn render(self, area: Rect, buf: &mut Buffer) {
-                // ensure that the cells under the popup are cleared to prevent the content from being outside the box
-                Clear.render(area, buf);
-                let block = Block::new()
-                    .title(self.title)
-                    .title_style(self.title_style)
-                    .borders(Borders::ALL)
-                    .border_style(self.border_style);
-                Paragraph::new(self.content)
-                    .wrap(Wrap { trim: true })
-                    .style(self.style)
-                    .block(block)
-                    .render(area, buf);
-            }
-        }
+        let popup_paragraph = Paragraph::new(content)
+            .block(popup_block)
+            .wrap(Wrap { trim: true })
+            .style(Style::default().fg(Color::White));
 
-        if self.show_popup {
-            const POPUP_WIDTH: u16 = 35;
-            const POPUP_HEIGHT: u16 = 5;
+        frame.render_widget(Clear, popup_area);
+        frame.render_widget(popup_paragraph, popup_area);
+    }
 
-            // Calculate centered popup area
-            let popup_area = Rect::new(
-                (area.width.saturating_sub(POPUP_WIDTH)) / 2,
-                (area.height.saturating_sub(POPUP_HEIGHT)) / 2,
-                POPUP_WIDTH,
-                POPUP_HEIGHT,
-            );
+    fn render_manual(&self, frame: &mut Frame, area: Rect) {
+        let manual_area = Rect::new(
+            (area.width.saturating_sub(60)) / 2,
+            (area.height.saturating_sub(20)) / 2,
+            60,
+            20,
+        );
 
-            let username = format!("Current User: {}", get_current_user());
-            let mut content = String::new();
+        let manual_description: [&str; 9] = [
+            "Press 'i' to switch network interface\n",
+            "Press 'c' to sort by CPU usage\n",
+            "Press 'm' to sort by Memory usage\n",
+            "Press 'p' to sort by PID\n",
+            "Press 'n' to sort by Name\n",
+            "Press 'Tab' to switch between CPU and Processes view\n",
+            "Use Up/Down arrows to scroll through CPU or Processes\n",
+            "Use Left/Right arrows to adjust fetch interval\n",
+            "Press 'q' to quit the application\n",
+        ];
 
-            content.push_str(&format!(
-                "{:-^width$}\n",
-                username,
-                width = POPUP_WIDTH as usize - 2
-            ));
+        let manual_content = manual_description
+            .iter()
+            .map(|s| Line::from(Span::raw(*s)))
+            .collect::<Vec<_>>();
 
-            let empty_lines = POPUP_HEIGHT as usize - 4;
-            for _ in 0..empty_lines {
-                content.push('\n');
-            }
+        let manual_block = Block::default()
+            .title("Options")
+            .title_alignment(Alignment::Center)
+            .title_bottom("Press 'Esc' to close")
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::LightBlue));
 
-            let popup_block = Block::default()
-                .title_top(
-                    Line::from(vec![
-                        Span::styled("".to_string(), Style::default()), // Empty span for left
-                        Span::styled("Welcome to the Dashboard ", Style::default()), // Time in the middle
-                        Span::styled("".to_string(), Style::default()), // Empty span for right
-                    ])
-                    .centered(),
-                )
-                .title_bottom(
-                    Line::from(vec![
-                        Span::styled("".to_string(), Style::default()), // Empty span for left
-                        Span::styled("Press Enter to close ", Style::default()), // Time in the middle
-                        Span::styled("".to_string(), Style::default()), // Empty span for right
-                    ])
-                    .centered(),
-                )
-                .title_alignment(Alignment::Right)
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .style(Style::default().fg(Color::LightBlue));
+        let manual_paragraph = Paragraph::new(manual_content)
+            .block(manual_block)
+            .wrap(Wrap { trim: true })
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Left);
 
-            let popup_paragraph = Paragraph::new(content)
-                .block(popup_block)
-                .wrap(Wrap { trim: true })
-                .style(Style::default().fg(Color::White));
-
-            frame.render_widget(Clear, popup_area);
-            frame.render_widget(popup_paragraph, popup_area);
-        }
-
-        if self.show_manual {
-            let manual_area = Rect::new(
-                (area.width.saturating_sub(60)) / 2,
-                (area.height.saturating_sub(20)) / 2,
-                60,
-                20,
-            );
-
-            let manual_description: [&'static str; 9] = [
-                "Press 'i' to switch network interface\n",
-                "Press 'c' to sort by CPU usage\n",
-                "Press 'm' to sort by Memory usage\n",
-                "Press 'p' to sort by PID\n",
-                "Press 'n' to sort by Name\n",
-                "Press 'Tab' to switch between CPU and Processes view\n",
-                "Use Up/Down arrows to scroll through CPU or Processes\n",
-                "Use Left/Right arrows to adjust fetch interval\n",
-                "Press 'q' to quit the application\n",
-            ];
-            // &&str is expected here, because iter iterates over the elements of the Vec and thus creates a reference to each element.
-            // Now a reference to this reference must be created to get the value.
-            let manual_content = manual_description
-                .iter()
-                .map(|s: &&str| Line::from(Span::raw(*s)))
-                .collect::<Vec<_>>();
-
-            let manual_block = Block::default()
-                .title("Options")
-                .title_alignment(Alignment::Center)
-                .title_bottom("Press 'Esc' to close")
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::LightBlue));
-
-            let manual_paragraph = Paragraph::new(manual_content)
-                .block(manual_block)
-                .wrap(Wrap { trim: true })
-                .style(Style::default().fg(Color::White))
-                .alignment(Alignment::Left);
-            frame.render_widget(Clear, manual_area);
-            frame.render_widget(manual_paragraph, manual_area);
-        }
+        frame.render_widget(Clear, manual_area);
+        frame.render_widget(manual_paragraph, manual_area);
     }
 }
 
-/// system_uptime() returns a formatted string representing the system's uptime.
-/// It calculates the uptime in seconds, minutes, hours, or days based on the total uptime
 fn system_uptime() -> String {
     let uptime = System::uptime();
     if uptime < 60 {

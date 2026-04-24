@@ -23,7 +23,6 @@ pub fn format_disk_information() -> String {
             byte_to_gib(disk.available_space())
         );
         result.push_str(&disk_info);
-        println!("{disk_info}");
     }
 
     result
